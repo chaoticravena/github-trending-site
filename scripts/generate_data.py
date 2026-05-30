@@ -32,8 +32,10 @@ ROW_RE = re.compile(
     r'^\| (\d+) \| \[([^\]]+)\]\(([^)]+)\) \| (\w+) \| (\d+) \| (.*?) \| (.+?) \|$'
 )
 
-# ── parse ─────────────────────────────────────────────────────────────────────
-def parse_md(path: Path) -> list[dict]:
+# ── parse: auto-detects .json vs .md ─────────────────────────────────────────
+def parse_source(path: Path) -> list[dict]:
+    if path.suffix == ".json":
+        return json.loads(path.read_text(encoding="utf-8"))
     repos = []
     for line in path.read_text(encoding="utf-8").splitlines():
         m = ROW_RE.match(line)
@@ -239,7 +241,7 @@ def main():
             raise FileNotFoundError(f"Source not found: {SRC}")
 
     print(f"Parsing  : {SRC.name}")
-    repos = parse_md(SRC)
+    repos = parse_source(SRC)
     print(f"Repos    : {len(repos):,}")
 
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
