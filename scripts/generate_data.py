@@ -15,7 +15,7 @@ ROOT     = Path(__file__).parent.parent
 HTML_OUT = ROOT / "docs" / "index.html"
 
 # ── CLI args ──────────────────────────────────────────────────────────────────
-_src_name = sys.argv[1] if len(sys.argv) > 1 else "repos_2023_2024_enriched.md"
+_src_name = sys.argv[1] if len(sys.argv) > 1 else "repos_enriched.json"
 _json_rel = sys.argv[2] if len(sys.argv) > 2 else "data/repos.json"
 SRC      = ROOT / "data" / _src_name
 JSON_OUT = ROOT / _json_rel
