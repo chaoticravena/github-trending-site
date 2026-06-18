@@ -3,286 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agente de Recomendação AI - GitHub Trending</title>
+    <title>chaoticravena/repos ✦ agente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
-        
-        env.allowLocalModels = false;
-        env.useBrowserCache = true;
 
-        const DB_NAME = 'RepoEmbeddingsDB';
+        env.allowLocalModels = false;
+        env.useBrowserCache  = true;
+
+        // ── constants ─────────────────────────────────────────────────────────
+        const DB_NAME    = 'RepoEmbeddingsDB';
         const DB_VERSION = 1;
         const STORE_NAME = 'embeddings';
         const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
+        const MAX_LOCAL  = 15;
+        const MAX_HIST   = 5;
 
-        let extractor;
-        let reposData = [];
-        let isReady = false;
+        // ── state ─────────────────────────────────────────────────────────────
+        let extractor, reposData = [], isReady = false;
+        let searchHistory = JSON.parse(sessionStorage.getItem('search_history') || '[]');
 
-        // UI Elements
-        const providerSelect = document.getElementById('provider-select');
-        const apiKeyInput = document.getElementById('api-key');
-        const queryInput = document.getElementById('query-input');
-        const searchBtn = document.getElementById('search-btn');
-        const statusMsg = document.getElementById('status-msg');
-        const resultsContainer = document.getElementById('results-container');
-        const loadingOverlay = document.getElementById('loading-overlay');
-
-        // Configurações de Provedores
+        // ── providers ─────────────────────────────────────────────────────────
         const PROVIDERS = {
-            anthropic: {
-                name: 'Claude (Anthropic)',
-                endpoint: 'https://api.anthropic.com/v1/messages',
-                model: 'claude-3-7-sonnet-20250219',
-                placeholder: 'sk-ant-...'
-            },
-            groq: {
-                name: 'Groq (Super Fast)',
-                endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-                model: 'llama-3.3-70b-versatile',
-                placeholder: 'gsk_...'
-            },
-            gemini: {
-                name: 'Google Gemini',
-                endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-                model: 'gemini-1.5-flash',
-                placeholder: 'AIza...'
-            },
-            openrouter: {
-                name: 'OpenRouter (Free Models)',
-                endpoint: 'https://openrouter.ai/api/v1/chat/completions',
-                model: 'google/gemini-2.0-flash-exp:free',
-                placeholder: 'sk-or-...'
-            }
+            anthropic:  { name: 'Claude (Anthropic)',       endpoint: 'https://api.anthropic.com/v1/messages',                                                      model: 'claude-3-7-sonnet-20250219',          placeholder: 'sk-ant-...' },
+            groq:       { name: 'Groq (Llama 3.3)',         endpoint: 'https://api.groq.com/openai/v1/chat/completions',                                             model: 'llama-3.3-70b-versatile',             placeholder: 'gsk_...'    },
+            gemini:     { name: 'Google Gemini',            endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',    model: 'gemini-1.5-flash',                    placeholder: 'AIza...'    },
+            openrouter: { name: 'OpenRouter (Free Models)', endpoint: 'https://openrouter.ai/api/v1/chat/completions',                                               model: 'google/gemini-2.0-flash-exp:free',    placeholder: 'sk-or-...'  }
         };
 
-        // Initialize Session Storage
-        providerSelect.addEventListener('change', () => {
-            const p = providerSelect.value;
-            apiKeyInput.placeholder = PROVIDERS[p].placeholder;
-            apiKeyInput.value = sessionStorage.getItem(`api_key_${p}`) || '';
+        // ── UI refs (module scripts are deferred — DOM is ready) ──────────────
+        const $  = id => document.getElementById(id);
+        const ui = {
+            provider:    $('provider-select'),
+            apiKey:      $('api-key'),
+            keyWarn:     $('api-key-warning'),
+            query:       $('query-input'),
+            searchBtn:   $('search-btn'),
+            status:      $('status-msg'),
+            progressBar: $('progress-bar'),
+            progressFill:$('progress-fill'),
+            progressPct: $('progress-pct'),
+            results:     $('results-container'),
+            overlay:     $('loading-overlay'),
+            overlayTxt:  $('overlay-status'),
+            history:     $('history-container'),
+        };
+
+        // ── api key persistence (localStorage) ────────────────────────────────
+        ui.provider.addEventListener('change', () => {
+            const p = ui.provider.value;
+            ui.apiKey.placeholder = PROVIDERS[p].placeholder;
+            const saved = localStorage.getItem(`api_key_${p}`) || '';
+            ui.apiKey.value = saved;
+            ui.keyWarn.classList.toggle('hidden', !saved);
         });
 
-        apiKeyInput.addEventListener('change', (e) => {
-            sessionStorage.setItem(`api_key_${providerSelect.value}`, e.target.value);
+        ui.apiKey.addEventListener('input', () => {
+            const p = ui.provider.value;
+            localStorage.setItem(`api_key_${p}`, ui.apiKey.value);
+            ui.keyWarn.classList.toggle('hidden', !ui.apiKey.value);
         });
 
-        // IndexedDB Helpers
-        async function openDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onupgradeneeded = (e) => {
+        // restore on load
+        const _initKey = localStorage.getItem(`api_key_${ui.provider.value}`) || '';
+        ui.apiKey.value = _initKey;
+        if (_initKey) ui.keyWarn.classList.remove('hidden');
+
+        // ── hash ──────────────────────────────────────────────────────────────
+        async function hashStr(str) {
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 16);
+        }
+
+        // ── indexeddb ─────────────────────────────────────────────────────────
+        function openDB() {
+            return new Promise((res, rej) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = e => {
                     const db = e.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'url' });
+                    if (!db.objectStoreNames.contains(STORE_NAME))
+                        db.createObjectStore(STORE_NAME, { keyPath: 'url' });
                 };
-                request.onsuccess = (e) => resolve(e.target.result);
-                request.onerror = (e) => reject(e.target.error);
+                req.onsuccess = e => res(e.target.result);
+                req.onerror   = e => rej(e.target.error);
             });
         }
 
-        async function getStoredEmbeddings() {
+        async function dbGetAll() {
             const db = await openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
+            return new Promise((res, rej) => {
+                const tx  = db.transaction(STORE_NAME, 'readonly');
+                const req = tx.objectStore(STORE_NAME).getAll();
+                req.onsuccess = () => res(req.result);
+                req.onerror   = () => rej(req.error);
             });
         }
 
-        async function saveEmbeddings(embeddings) {
+        async function dbSave(items) {
             const db = await openDB();
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction(STORE_NAME, 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                embeddings.forEach(item => store.put(item));
-                transaction.oncomplete = () => resolve();
-                transaction.onerror = () => reject(transaction.error);
+            return new Promise((res, rej) => {
+                const tx    = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                items.forEach(item => store.put(item));
+                tx.oncomplete = res;
+                tx.onerror    = () => rej(tx.error);
             });
         }
 
-        function dotProduct(a, b) { return a.reduce((sum, val, i) => sum + val * b[i], 0); }
-        function cosineSimilarity(vecA, vecB) {
-            const dot = dotProduct(vecA, vecB);
-            const magA = Math.sqrt(dotProduct(vecA, vecA));
-            const magB = Math.sqrt(dotProduct(vecB, vecB));
-            return dot / (magA * magB);
+        async function dbClear() {
+            const db = await openDB();
+            return new Promise((res, rej) => {
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).clear();
+                tx.oncomplete = res;
+                tx.onerror    = () => rej(tx.error);
+            });
         }
 
+        // ── similarity ────────────────────────────────────────────────────────
+        function cosine(a, b) {
+            let dot = 0, ma = 0, mb = 0;
+            for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; ma += a[i]*a[i]; mb += b[i]*b[i]; }
+            return dot / (Math.sqrt(ma) * Math.sqrt(mb));
+        }
+
+        // ── status / progress ─────────────────────────────────────────────────
+        function setStatus(msg, cls = 'text-gray-400') {
+            ui.status.className = `mt-3 text-xs font-medium text-center italic ${cls}`;
+            ui.status.innerText = msg;
+        }
+
+        function showProg(pct) {
+            ui.progressBar.classList.remove('hidden');
+            ui.progressFill.style.width = `${Math.min(pct, 100)}%`;
+            ui.progressPct.innerText    = `${Math.round(pct)}%`;
+        }
+
+        function hideProg() { ui.progressBar.classList.add('hidden'); }
+
+        // ── search history ────────────────────────────────────────────────────
+        function addHistory(q) {
+            searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, MAX_HIST);
+            sessionStorage.setItem('search_history', JSON.stringify(searchHistory));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (!searchHistory.length) { ui.history.classList.add('hidden'); return; }
+            ui.history.classList.remove('hidden');
+            ui.history.innerHTML =
+                '<span class="text-xs text-gray-400 self-center shrink-0">Recentes:</span>' +
+                searchHistory.map(q =>
+                    `<button class="hist text-xs bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500 px-3 py-1 rounded-full border border-gray-200 transition-colors">${q}</button>`
+                ).join('');
+            ui.history.querySelectorAll('.hist').forEach(btn =>
+                btn.addEventListener('click', () => { ui.query.value = btn.textContent; ui.searchBtn.click(); })
+            );
+        }
+
+        // ── init ──────────────────────────────────────────────────────────────
         async function init() {
             try {
-                statusMsg.innerText = "Carregando modelo de IA local...";
-                extractor = await pipeline('feature-extraction', MODEL_NAME);
-                
-                statusMsg.innerText = "Carregando base de dados...";
-                let response;
-                const paths = ['../data/repos_enriched.json', 'data/repos_enriched.json', './data/repos_enriched.json', '../data/repos.json'];
-                for (const path of paths) {
-                    try {
-                        const res = await fetch(path);
-                        if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
-                            response = res; break;
-                        }
-                    } catch (e) {}
-                }
+                setStatus('Carregando modelo de IA local...', 'text-blue-500');
+                showProg(0);
 
-                if (!response) throw new Error("JSON não encontrado.");
-                reposData = await response.json();
-
-                const cached = await getStoredEmbeddings();
-                const cachedMap = new Map(cached.map(c => [c.url, c.embedding]));
-                const toEmbed = reposData.filter(r => !cachedMap.has(r.url));
-                
-                if (toEmbed.length > 0) {
-                    statusMsg.innerText = `Processando ${toEmbed.length} novos repositórios...`;
-                    const newEmbeddings = [];
-                    for (let i = 0; i < toEmbed.length; i++) {
-                        const repo = toEmbed[i];
-                        const text = `${repo.name} ${repo.desc} ${repo.category || ''} ${repo.lang || ''}`;
-                        const output = await extractor(text, { pooling: 'mean', normalize: true });
-                        const embedding = Array.from(output.data);
-                        newEmbeddings.push({ url: repo.url, embedding });
-                        repo.embedding = embedding;
-                        if (i % 20 === 0) statusMsg.innerText = `Indexando: ${i}/${toEmbed.length}`;
+                extractor = await pipeline('feature-extraction', MODEL_NAME, {
+                    progress_callback: p => {
+                        if ((p.status === 'progress' || p.status === 'download') && p.progress != null)
+                            showProg(p.progress);
+                        else if (p.status === 'done')
+                            showProg(100);
                     }
-                    await saveEmbeddings(newEmbeddings);
+                });
+
+                hideProg();
+                setStatus('Carregando base de dados...', 'text-blue-500');
+
+                let response;
+                for (const path of ['../data/repos_enriched.json', 'data/repos_enriched.json', '../data/repos.json', 'data/repos.json']) {
+                    try { const r = await fetch(path); if (r.ok) { response = r; break; } } catch {}
+                }
+                if (!response) throw new Error('JSON não encontrado.');
+
+                const reposText  = await response.text();
+                const currHash   = await hashStr(reposText);
+                const storedHash = localStorage.getItem('repos_hash');
+
+                if (storedHash !== currHash) {
+                    setStatus('Nova versão detectada — recalculando índice...', 'text-amber-500');
+                    await dbClear();
+                    localStorage.setItem('repos_hash', currHash);
                 }
 
-                reposData.forEach(repo => { if (!repo.embedding) repo.embedding = cachedMap.get(repo.url); });
+                reposData = JSON.parse(reposText);
+
+                const cached    = await dbGetAll();
+                const cachedMap = new Map(cached.map(c => [c.url, c.embedding]));
+                const toEmbed   = reposData.filter(r => !cachedMap.has(r.url));
+
+                if (toEmbed.length > 0) {
+                    showProg(0);
+                    const batch = [];
+                    for (let i = 0; i < toEmbed.length; i++) {
+                        const r    = toEmbed[i];
+                        const text = `${r.name} ${r.desc || ''} ${r.category || ''} ${r.lang || ''}`;
+                        const out  = await extractor(text, { pooling: 'mean', normalize: true });
+                        const emb  = Array.from(out.data);
+                        batch.push({ url: r.url, embedding: emb });
+                        r.embedding = emb;
+
+                        const pct = ((i + 1) / toEmbed.length) * 100;
+                        if (i % 15 === 0 || i === toEmbed.length - 1) {
+                            showProg(pct);
+                            setStatus(`Indexando: ${i + 1} / ${toEmbed.length}`, 'text-blue-500');
+                        }
+                    }
+                    await dbSave(batch);
+                }
+
+                reposData.forEach(r => { if (!r.embedding) r.embedding = cachedMap.get(r.url); });
+
                 isReady = true;
-                statusMsg.innerText = "Pronto para buscar!";
-                statusMsg.classList.add('text-green-600');
-                apiKeyInput.value = sessionStorage.getItem(`api_key_${providerSelect.value}`) || '';
+                hideProg();
+                setStatus('✦ pronto para buscar', 'text-green-600');
+                renderHistory();
             } catch (err) {
-                statusMsg.innerText = "Erro: " + err.message;
-                statusMsg.classList.add('text-red-600');
+                hideProg();
+                setStatus('Erro: ' + err.message, 'text-red-600');
+                console.error(err);
             }
         }
 
-        async function githubSearch(query) {
-            const res = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=5`);
-            const data = await res.json();
-            return (data.items || []).map(item => ({
-                name: item.full_name, url: item.html_url, desc: item.description, lang: item.language, source: 'GitHub Search'
-            }));
-        }
-
-        async function callLLM(provider, apiKey, system, messages, tools = null) {
-            const config = PROVIDERS[provider];
-            let body, headers = { 'Content-Type': 'application/json' };
+        // ── llm ───────────────────────────────────────────────────────────────
+        async function callLLM(provider, apiKey, system, userContent) {
+            const cfg     = PROVIDERS[provider];
+            const headers = { 'Content-Type': 'application/json' };
 
             if (provider === 'anthropic') {
-                headers['x-api-key'] = apiKey;
-                headers['anthropic-version'] = '2023-06-01';
-                headers['anthropic-dangerous-direct-browser-access'] = 'true';
-                body = { model: config.model, max_tokens: 1500, system, messages, tools };
-            } else if (provider === 'gemini') {
-                const url = `${config.endpoint}?key=${apiKey}`;
-                body = { contents: [{ parts: [{ text: `${system}\n\n${messages[messages.length-1].content}` }] }] };
-                const res = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
+                Object.assign(headers, {
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                });
+                const res  = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, max_tokens: 2000, system, messages: [{ role: 'user', content: userContent }] }) });
                 const data = await res.json();
-                return { content: [{ text: data.candidates[0].content.parts[0].text }] };
-            } else {
-                // Groq & OpenRouter (OpenAI format)
-                headers['Authorization'] = `Bearer ${apiKey}`;
-                body = { model: config.model, messages: [{ role: 'system', content: system }, ...messages] };
-                const res = await fetch(config.endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
-                const data = await res.json();
-                return { content: [{ text: data.choices[0].message.content }] };
+                return data.content?.[0]?.text ?? '';
             }
 
-            const res = await fetch(config.endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
-            return await res.json();
+            if (provider === 'gemini') {
+                const res  = await fetch(`${cfg.endpoint}?key=${apiKey}`, { method: 'POST', headers, body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${userContent}` }] }] }) });
+                const data = await res.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+            }
+
+            // groq / openrouter — openai format
+            headers['Authorization'] = `Bearer ${apiKey}`;
+            const res  = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }] }) });
+            const data = await res.json();
+            return data.choices?.[0]?.message?.content ?? '';
         }
 
-        async function runAgent(userQuery) {
-            const provider = providerSelect.value;
-            const apiKey = apiKeyInput.value;
-            if (!apiKey) return alert("Insira a API Key.");
+        // ── agent ─────────────────────────────────────────────────────────────
+        async function runAgent(query) {
+            const provider = ui.provider.value;
+            const apiKey   = ui.apiKey.value.trim();
+            if (!apiKey) return alert('Insira a API Key.');
 
-            loadingOverlay.classList.remove('hidden');
-            resultsContainer.innerHTML = '';
+            ui.overlay.classList.remove('hidden');
+            ui.results.innerHTML = '';
+            addHistory(query);
 
             try {
-                const queryEmbeddingOutput = await extractor(userQuery, { pooling: 'mean', normalize: true });
-                const queryEmbedding = Array.from(queryEmbeddingOutput.data);
+                // step 1
+                ui.overlayTxt.innerText = 'buscando similaridade...';
+                setStatus('🔍 buscando similaridade...', 'text-blue-500');
+
+                const qOut = await extractor(query, { pooling: 'mean', normalize: true });
+                const qEmb = Array.from(qOut.data);
 
                 const localResults = reposData
-                    .map(repo => ({ ...repo, similarity: cosineSimilarity(queryEmbedding, repo.embedding), source: 'Local' }))
-                    .sort((a, b) => b.similarity - a.similarity).slice(0, 8);
+                    .filter(r => r.embedding)
+                    .map(r => ({ ...r, sim: cosine(qEmb, r.embedding) }))
+                    .sort((a, b) => b.sim - a.sim)
+                    .slice(0, MAX_LOCAL);
 
-                const system = "Você é um agente especialista em recomendar repositórios do GitHub. Retorne uma lista ranqueada em formato JSON [ {name, url, desc, reason, source} ].";
-                const userPrompt = `Usuário quer: "${userQuery}"\n\nLocais:\n${JSON.stringify(localResults.map(r => ({name: r.name, desc: r.desc})), null, 2)}`;
-                
-                const data = await callLLM(provider, apiKey, system, [{ role: 'user', content: userPrompt }]);
-                
-                const finalContent = data.content[0].text || data.content[0].text;
-                const jsonMatch = finalContent.match(/\[[\s\S]*\]/);
-                renderResults(jsonMatch ? JSON.parse(jsonMatch[0]) : []);
+                // step 2
+                ui.overlayTxt.innerText = 'consultando IA...';
+                setStatus('🤖 consultando IA...', 'text-purple-500');
+
+                const system = `Você é um agente especialista nos repositórios da coleção chaoticravena/github-trending-site. Baseie suas recomendações exclusivamente nos repos locais. Seja direto — explique por que cada repo se encaixa na ideia do usuário. Responda sempre em português.
+
+Retorne APENAS um array JSON válido com até 6 objetos no formato:
+[ { "name": "owner/repo", "url": "...", "desc": "...", "reason": "..." } ]`;
+
+                const context = localResults.map(r => ({
+                    name:     r.name,
+                    url:      r.url,
+                    desc:     r.desc     || '',
+                    category: r.category || '',
+                    rating:   r.rating   || '',
+                    days:     r.days     || 0,
+                    lang:     r.lang     || ''
+                }));
+
+                const userContent = `Usuário quer: "${query}"\n\nRepositórios locais mais similares (${localResults.length}):\n${JSON.stringify(context, null, 2)}`;
+
+                const raw   = await callLLM(provider, apiKey, system, userContent);
+                const match = raw.match(/\[[\s\S]*\]/);
+                const repos = match ? JSON.parse(match[0]) : [];
+
+                renderResults(repos);
+
+                // step 3
+                setStatus('✦ pronto', 'text-green-600');
             } catch (err) {
-                alert("Erro: " + err.message);
+                setStatus('Erro: ' + err.message, 'text-red-600');
+                ui.results.innerHTML = `<div class="text-center text-red-500 py-8 text-sm">Erro: ${err.message}</div>`;
+                console.error(err);
             } finally {
-                loadingOverlay.classList.add('hidden');
+                ui.overlay.classList.add('hidden');
+                ui.overlayTxt.innerText = '';
             }
         }
 
+        // ── render ────────────────────────────────────────────────────────────
         function renderResults(repos) {
-            resultsContainer.innerHTML = repos.map(repo => `
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start mb-2">
-                        <h3 class="text-xl font-bold text-blue-600"><a href="${repo.url}" target="_blank" class="hover:underline">${repo.name}</a></h3>
-                        <span class="px-2 py-1 text-xs font-semibold rounded ${repo.source === 'Local' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}">${repo.source}</span>
+            if (!repos.length) {
+                ui.results.innerHTML = '<p class="text-center text-gray-400 py-10 text-sm">Nenhum resultado encontrado.</p>';
+                return;
+            }
+            ui.results.innerHTML = repos.map((r, i) => `
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start gap-3 mb-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center">${i+1}</span>
+                            <h3 class="font-bold text-blue-600 truncate"><a href="${r.url}" target="_blank" class="hover:underline">${r.name}</a></h3>
+                        </div>
+                        <span class="shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Local</span>
                     </div>
-                    <p class="text-gray-600 mb-4 text-sm">${repo.desc || ''}</p>
-                    <div class="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400 text-sm text-blue-800"><strong>Por que:</strong> ${repo.reason}</div>
+                    <p class="text-gray-500 text-sm mb-3 leading-relaxed">${r.desc || ''}</p>
+                    <div class="bg-blue-50 px-4 py-2.5 rounded-lg border-l-4 border-blue-400 text-sm text-blue-800 leading-relaxed"><strong>Por que:</strong> ${r.reason}</div>
                 </div>
             `).join('');
         }
 
-        searchBtn.addEventListener('click', () => { const q = queryInput.value.trim(); if (q && isReady) runAgent(q); });
-        queryInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') searchBtn.click(); });
+        // ── events ────────────────────────────────────────────────────────────
+        ui.searchBtn.addEventListener('click', () => {
+            const q = ui.query.value.trim();
+            if (!q) return;
+            if (!isReady) { setStatus('Aguarde o sistema carregar...', 'text-amber-500'); return; }
+            runAgent(q);
+        });
+
+        ui.query.addEventListener('keypress', e => { if (e.key === 'Enter') ui.searchBtn.click(); });
+
         init();
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-gray-900">
-    <div class="max-w-4xl mx-auto px-4 py-10">
-        <header class="text-center mb-10">
-            <h1 class="text-3xl font-black mb-2">Agente de Recomendação AI</h1>
-            <p class="text-gray-500">Encontre ferramentas no seu banco local e no GitHub.</p>
+    <div class="max-w-3xl mx-auto px-4 py-10">
+
+        <header class="text-center mb-8">
+            <h1 class="text-2xl font-black tracking-tight mb-1">
+                chaoticravena/repos <span class="text-blue-500">✦</span> agente
+            </h1>
+            <p class="text-gray-400 text-sm">descreve teu projeto e eu indico os repos certos da coleção</p>
         </header>
 
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-8">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-6">
+
+            <!-- provider + api key -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Provedor de IA</label>
-                    <select id="provider-select" class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Provedor de IA</label>
+                    <select id="provider-select" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="anthropic">Claude (Anthropic)</option>
                         <option value="groq">Groq (Llama 3.3)</option>
                         <option value="gemini">Google Gemini 1.5</option>
-                        <option value="openrouter">OpenRouter (Free Models)</option>
+                        <option value="openrouter">OpenRouter (Free)</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase text-gray-400 mb-1">API Key</label>
-                    <input type="password" id="api-key" placeholder="sk-ant-..." class="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">API Key</label>
+                    <input type="password" id="api-key" placeholder="sk-ant-..."
+                           class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                    <p id="api-key-warning" class="hidden text-xs text-amber-500 mt-1 flex items-center gap-1">
+                        <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+                        chave salva localmente no seu browser
+                    </p>
                 </div>
             </div>
+
+            <!-- search bar -->
             <div class="flex gap-2">
-                <input type="text" id="query-input" placeholder="O que você quer construir?" class="flex-1 px-5 py-3 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="search-btn" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all">Buscar</button>
+                <input type="text" id="query-input" placeholder="O que você quer construir?"
+                       class="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="search-btn"
+                        class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all">
+                    Buscar
+                </button>
             </div>
-            <p id="status-msg" class="mt-4 text-xs font-medium text-center text-gray-400 italic">Inicializando sistema...</p>
+
+            <!-- search history -->
+            <div id="history-container" class="hidden flex flex-wrap gap-2 mt-3 items-center"></div>
+
+            <!-- progress bar -->
+            <div id="progress-bar" class="hidden mt-4 px-1">
+                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                    <span class="italic">Carregando modelo</span>
+                    <span id="progress-pct" class="font-mono">0%</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div id="progress-fill"
+                         class="bg-blue-500 h-1.5 rounded-full transition-all duration-150 ease-out"
+                         style="width:0%"></div>
+                </div>
+            </div>
+
+            <!-- status line -->
+            <p id="status-msg" class="mt-3 text-xs font-medium text-center italic text-gray-400">Inicializando sistema...</p>
         </div>
 
-        <div id="results-container" class="grid gap-4"></div>
+        <!-- results -->
+        <div id="results-container" class="grid gap-3"></div>
     </div>
 
-    <div id="loading-overlay" class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <!-- loading overlay -->
+    <div id="loading-overlay"
+         class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
         <div class="text-center">
-            <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p class="font-bold text-gray-800">Consultando IAs...</p>
+            <div class="animate-spin rounded-full h-9 w-9 border-2 border-gray-200 border-t-blue-600 mx-auto mb-3"></div>
+            <p id="overlay-status" class="text-sm font-medium text-gray-500 tracking-wide"></p>
         </div>
     </div>
 </body>
