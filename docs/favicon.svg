@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- background -->
+  <rect width="32" height="32" fill="#0c0c0f"/>
+  <!-- pink outer frame -->
+  <rect x="0" y="0" width="32" height="2" fill="#ff6eb4"/>
+  <rect x="0" y="30" width="32" height="2" fill="#ff6eb4"/>
+  <rect x="0" y="2"  width="2"  height="28" fill="#ff6eb4"/>
+  <rect x="30" y="2" width="2"  height="28" fill="#ff6eb4"/>
+  <!-- teal titlebar -->
+  <rect x="2" y="2" width="28" height="7" fill="#00a896"/>
+  <!-- pink close button on titlebar -->
+  <rect x="24" y="3" width="5" height="5" fill="#ff6eb4"/>
+  <!-- titlebar / content separator -->
+  <rect x="2" y="9" width="28" height="1" fill="#ff6eb4"/>
+  <!-- > chevron (pixel blocks, 3×2 each) -->
+  <rect x="5"  y="13" width="3" height="2" fill="#ff6eb4"/>
+  <rect x="8"  y="15" width="3" height="2" fill="#ff6eb4"/>
+  <rect x="11" y="17" width="3" height="2" fill="#ff6eb4"/>
+  <rect x="8"  y="19" width="3" height="2" fill="#ff6eb4"/>
+  <rect x="5"  y="21" width="3" height="2" fill="#ff6eb4"/>
+  <!-- _ cursor -->
+  <rect x="16" y="25" width="10" height="2" fill="#ff6eb4"/>
+</svg>

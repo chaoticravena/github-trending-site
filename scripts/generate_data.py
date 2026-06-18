@@ -134,6 +134,7 @@ HTML_TEMPLATE = """\
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>chaoticravena/repos · __TITLE__ · Python &amp; JS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -657,8 +658,16 @@ def main():
         print(f"  {n:>5}  {cat}")
 
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
-    JSON_OUT.write_text(json.dumps(repos, ensure_ascii=False, indent=2), encoding="utf-8")
+    json_text = json.dumps(repos, ensure_ascii=False, indent=2)
+    JSON_OUT.write_text(json_text, encoding="utf-8")
     print(f"JSON     : {JSON_OUT.name}  ({JSON_OUT.stat().st_size // 1024} KB)")
+
+    # Mirror JSON into docs/data/ so GitHub Pages can serve it to agent.html
+    docs_data = ROOT / "docs" / "data"
+    docs_data.mkdir(parents=True, exist_ok=True)
+    docs_json = docs_data / "repos.json"
+    docs_json.write_text(json_text, encoding="utf-8")
+    print(f"JSON     : docs/data/repos.json  ({docs_json.stat().st_size // 1024} KB)  [Pages mirror]")
 
     HTML_OUT.parent.mkdir(parents=True, exist_ok=True)
     html = (HTML_TEMPLATE
