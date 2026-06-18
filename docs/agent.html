@@ -1,584 +1,608 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>chaoticravena/repos ✦ agente</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-        .stream-cursor {
-            display: inline-block;
-            width: 7px; height: 14px;
-            background: #3b82f6;
-            vertical-align: middle;
-            margin-left: 1px;
-            animation: blink .8s step-start infinite;
-        }
-        .back-btn {
-            position: fixed; top: 16px; left: 16px; z-index: 50;
-            font-family: 'Press Start 2P', monospace; font-size: 8px;
-            color: #ff6eb4; border: 2px solid #ff6eb4;
-            padding: 7px 11px; background: #0c0c0f;
-            box-shadow: 2px 2px 0 #00a896;
-            text-decoration: none; line-height: 1;
-            transition: box-shadow .08s, transform .08s, color .08s, border-color .08s;
-        }
-        .back-btn:hover {
-            box-shadow: 1px 1px 0 #00a896; transform: translate(1px,1px);
-            color: #00a896; border-color: #00a896;
-        }
-        .back-btn:active { box-shadow: none; transform: translate(2px,2px); }
-    </style>
-    <script type="module">
-        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>chaoticravena/repos ✦ agente</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{--bg:#0c0c0f;--surface:#13131a;--border:#1e1e2e;--text:#e8e8f0;--muted:#666688;--pink:#ff6eb4;--teal:#00a896}
+*{border-radius:0!important}
+.hidden{display:none!important}
+body{background:var(--bg);color:var(--text);font-family:'VT323',monospace;font-size:19px}
+a{color:var(--pink)}a:hover{color:var(--teal)}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 
-        env.allowLocalModels = false;
-        env.useBrowserCache  = true;
+/* ── back button ── */
+.back-btn{position:fixed;top:16px;left:16px;z-index:9999;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--pink);border:2px solid var(--pink);padding:7px 10px;background:var(--bg);box-shadow:2px 2px 0 var(--teal);text-decoration:none;transition:box-shadow .08s,transform .08s,color .08s,border-color .08s}
+.back-btn:hover{box-shadow:1px 1px 0 var(--teal);transform:translate(1px,1px);color:var(--teal);border-color:var(--teal)}
+.back-btn:active{box-shadow:none;transform:translate(2px,2px)}
 
-        // ── constants ─────────────────────────────────────────────────────────
-        const DB_NAME    = 'RepoEmbeddingsDB';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'embeddings';
-        const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-        const MAX_LOCAL  = 15;
-        const MAX_HIST   = 10;
-        const HIST_KEY   = 'agent_history';
+/* ── header ── */
+.win-bar{display:flex;align-items:center;gap:.5rem;background:var(--teal);padding:.3rem .75rem;margin-bottom:1rem;box-shadow:4px 4px 0 var(--pink)}
+.win-bar-title{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--bg);flex:1;text-align:center}
+.win-dots{display:flex;gap:5px}
+.win-dot{width:11px;height:11px;background:var(--bg);border:1px solid rgba(0,0,0,.3)}
+.win-dot.close{background:var(--pink)}
+header h1{font-family:'Press Start 2P',monospace;font-size:clamp(9px,2.5vw,15px);color:var(--pink);text-shadow:3px 3px 0 rgba(0,168,150,.35);line-height:1.7;margin-bottom:.35rem}
+.agent-tag{font-family:'VT323',monospace;font-size:20px;color:var(--teal)}
+header p.sub{color:var(--muted);font-size:17px}
 
-        const STREAMING_PROVIDERS = new Set(['anthropic', 'openrouter']);
+/* ── panel shared ── */
+.panel-bar{display:flex;align-items:center;gap:.4rem;padding:.25rem .55rem}
+.panel-bar.teal{background:var(--teal)}
+.panel-bar.pink{background:var(--pink)}
+.panel-bar-title{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--bg);flex:1}
+.panel-xbtn{width:14px;height:12px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--bg);flex-shrink:0}
+.panel-bar.teal .panel-xbtn{background:var(--pink);border:1px solid var(--bg)}
+.panel-bar.pink .panel-xbtn{background:var(--bg);color:var(--pink);border:1px solid var(--bg)}
 
-        // ── state ─────────────────────────────────────────────────────────────
-        let extractor, reposData = [], isReady = false;
-        let searchHistory = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+/* ── config panel ── */
+.config-panel{background:var(--surface);border:2px solid var(--border);margin-bottom:1rem;box-shadow:2px 2px 0 var(--pink),-2px -2px 0 var(--teal)}
+.field-label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--teal);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.08em}
+select,input[type="password"]{background:var(--bg);border:2px solid var(--border);color:var(--teal);padding:.3rem .5rem;font-family:'VT323',monospace;font-size:19px;outline:none;-webkit-appearance:none;width:100%}
+select:focus,input[type="password"]:focus{border-color:var(--pink);color:var(--text)}
+option{background:var(--surface)}
+.key-warn{font-size:15px;color:#ffd700;margin-top:.25rem}
 
-        // ── providers ─────────────────────────────────────────────────────────
-        const PROVIDERS = {
-            anthropic:  { name: 'Claude (Anthropic)',       endpoint: 'https://api.anthropic.com/v1/messages',                                                      model: 'claude-3-7-sonnet-20250219',          placeholder: 'sk-ant-...' },
-            groq:       { name: 'Groq (Llama 3.3)',         endpoint: 'https://api.groq.com/openai/v1/chat/completions',                                             model: 'llama-3.3-70b-versatile',             placeholder: 'gsk_...'    },
-            gemini:     { name: 'Google Gemini',            endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',    model: 'gemini-1.5-flash',                    placeholder: 'AIza...'    },
-            openrouter: { name: 'OpenRouter (Free Models)', endpoint: 'https://openrouter.ai/api/v1/chat/completions',                                               model: 'google/gemini-2.0-flash-exp:free',    placeholder: 'sk-or-...'  }
-        };
+/* ── search panel ── */
+.search-panel{background:var(--surface);border:2px solid var(--border);margin-bottom:1.25rem;box-shadow:2px 2px 0 var(--teal),-2px -2px 0 var(--pink)}
+.terminal-row{display:flex;align-items:stretch;border-bottom:1px solid var(--border)}
+.terminal-prompt{font-family:'VT323',monospace;font-size:19px;color:var(--teal);padding:.35rem .5rem .35rem .7rem;white-space:nowrap;user-select:none;border-right:2px solid var(--border);align-self:center}
+#query-input{flex:1;background:transparent;border:none;color:var(--text);font-family:'VT323',monospace;font-size:19px;padding:.35rem .5rem;outline:none;caret-color:var(--pink)}
+#query-input::placeholder{color:#44445a}
+#search-btn{background:var(--pink);color:var(--bg);border:none;border-left:2px solid var(--border);font-family:'Press Start 2P',monospace;font-size:7px;padding:0 .85rem;cursor:pointer;white-space:nowrap;transition:background .08s,transform .08s}
+#search-btn:hover{background:var(--teal)}
+#search-btn:active{transform:translate(1px,1px)}
 
-        // ── UI refs (module scripts are deferred — DOM is ready) ──────────────
-        const $  = id => document.getElementById(id);
-        const ui = {
-            provider:    $('provider-select'),
-            apiKey:      $('api-key'),
-            keyWarn:     $('api-key-warning'),
-            query:       $('query-input'),
-            searchBtn:   $('search-btn'),
-            status:      $('status-msg'),
-            progressBar: $('progress-bar'),
-            progressFill:$('progress-fill'),
-            progressPct: $('progress-pct'),
-            results:     $('results-container'),
-            overlay:     $('loading-overlay'),
-            overlayTxt:  $('overlay-status'),
-            history:     $('history-container'),
-        };
+/* ── history ── */
+.history-row{display:flex;flex-wrap:wrap;gap:.35rem;align-items:center;padding:.4rem .65rem;border-bottom:1px solid var(--border)}
+.hist-label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--muted)}
+.hist-pill{display:inline-flex;align-items:stretch;border:1px solid var(--teal);box-shadow:1px 1px 0 var(--teal)}
+.hist-pill .hist-text{background:transparent;border:none;color:var(--teal);padding:1px 7px 1px 5px;cursor:pointer;font-family:'VT323',monospace;font-size:17px;line-height:1.2}
+.hist-pill .hist-text:hover{background:var(--teal);color:var(--bg)}
+.hist-pill .hist-rm{background:transparent;border:none;border-left:1px solid var(--teal);color:var(--muted);padding:1px 5px;cursor:pointer;font-family:'VT323',monospace;font-size:17px;line-height:1.2}
+.hist-pill .hist-rm:hover{background:var(--pink);color:var(--bg);border-color:var(--pink)}
 
-        // ── api key persistence (localStorage) ────────────────────────────────
-        ui.provider.addEventListener('change', () => {
-            const p = ui.provider.value;
-            ui.apiKey.placeholder = PROVIDERS[p].placeholder;
-            const saved = localStorage.getItem(`api_key_${p}`) || '';
-            ui.apiKey.value = saved;
-            ui.keyWarn.classList.toggle('hidden', !saved);
+/* ── progress ── */
+.progress-box{padding:.45rem .65rem;border-bottom:1px solid var(--border)}
+.progress-label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--teal);margin-bottom:.25rem}
+.progress-track{display:flex;align-items:center;gap:.5rem}
+.progress-blocks{font-family:'VT323',monospace;font-size:22px;color:var(--pink);flex:1;letter-spacing:-.5px}
+.progress-pct{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--teal);min-width:36px;text-align:right}
+
+/* ── status ── */
+.status-line{padding:.35rem .65rem;font-family:'VT323',monospace;font-size:18px;color:var(--muted);text-align:center}
+.status-line[data-type="info"]{color:var(--teal)}
+.status-line[data-type="success"]{color:var(--pink)}
+.status-line[data-type="error"]{color:#f87171}
+.status-line[data-type="warn"]{color:#ffd700}
+
+/* ── result cards ── */
+.result-card{border:2px solid var(--border);background:var(--surface);box-shadow:2px 2px 0 var(--pink),-2px -2px 0 var(--teal);margin-bottom:.65rem}
+.result-card:hover{box-shadow:3px 3px 0 var(--pink),-3px -3px 0 var(--teal)}
+.result-titlebar{display:flex;align-items:center;gap:.4rem;background:var(--teal);padding:.22rem .5rem}
+.result-num{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--bg);background:var(--pink);padding:2px 4px;flex-shrink:0}
+.result-name{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--bg);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none}
+.result-name:hover{text-decoration:underline;color:var(--bg)}
+.result-close{width:14px;height:12px;background:var(--pink);border:1px solid var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--bg);flex-shrink:0}
+.result-body{padding:.65rem .7rem}
+.result-desc{color:#888899;font-size:18px;margin-bottom:.5rem;line-height:1.35}
+.result-reason{border:1px solid var(--border);border-left:3px solid var(--pink);background:rgba(255,110,180,.05)}
+.result-reason-label{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--pink);padding:.22rem .5rem;border-bottom:1px solid var(--border);background:rgba(255,110,180,.07)}
+.result-reason-body{padding:.35rem .5rem;font-size:18px;color:var(--text);line-height:1.35}
+
+/* ── stream window ── */
+.stream-win{border:2px solid var(--pink);background:var(--bg);box-shadow:3px 3px 0 var(--teal);margin-bottom:.5rem}
+.stream-win-bar{display:flex;align-items:center;gap:.4rem;background:var(--teal);padding:.22rem .5rem}
+.stream-win-title{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--bg);flex:1}
+.stream-win-live{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--bg);animation:blink 1s step-start infinite}
+.stream-win-close{width:14px;height:12px;background:var(--pink);border:1px solid var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--bg)}
+.stream-win-body{padding:.65rem .7rem;font-family:'VT323',monospace;font-size:17px;color:var(--teal);white-space:pre-wrap;line-height:1.35;min-height:80px;max-height:220px;overflow-y:auto}
+.stream-cursor{display:inline-block;width:10px;height:17px;background:var(--pink);vertical-align:middle;margin-left:1px;animation:blink .7s step-start infinite}
+
+/* ── overlay ── */
+#loading-overlay{position:fixed;inset:0;background:rgba(12,12,15,.85);display:flex;align-items:center;justify-content:center;z-index:9000;backdrop-filter:blur(2px)}
+.overlay-box{border:2px solid var(--teal);background:var(--surface);box-shadow:4px 4px 0 var(--pink),-4px -4px 0 var(--teal);min-width:240px}
+.overlay-bar{background:var(--teal);padding:.3rem .6rem;display:flex;justify-content:space-between;align-items:center}
+.overlay-bar-title{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--bg)}
+.overlay-xbtn{width:14px;height:12px;background:var(--pink);border:1px solid var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:8px;color:var(--bg)}
+.overlay-body{padding:1.25rem 1rem;text-align:center}
+.overlay-dots{font-family:'VT323',monospace;font-size:28px;color:var(--teal);letter-spacing:3px;animation:blink 1.1s step-start infinite;margin-bottom:.6rem}
+#overlay-status{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--pink)}
+
+/* ── empty state ── */
+.empty-win{border:2px solid var(--border);background:var(--surface);box-shadow:2px 2px 0 var(--pink);max-width:360px;margin:2rem auto}
+.empty-titlebar{background:var(--teal);padding:.22rem .5rem;display:flex;justify-content:space-between;align-items:center}
+.empty-title{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--bg)}
+.empty-body{padding:1.5rem;text-align:center}
+.empty-ico{font-size:32px;margin-bottom:.4rem}
+.empty-msg{font-size:18px;color:var(--muted)}
+</style>
+<script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+    env.allowLocalModels = false;
+    env.useBrowserCache  = true;
+
+    // ── constants ─────────────────────────────────────────────────────────
+    const DB_NAME    = 'RepoEmbeddingsDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'embeddings';
+    const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
+    const MAX_LOCAL  = 15;
+    const MAX_HIST   = 10;
+    const HIST_KEY   = 'agent_history';
+
+    const STREAMING_PROVIDERS = new Set(['anthropic', 'openrouter']);
+
+    // ── state ─────────────────────────────────────────────────────────────
+    let extractor, reposData = [], isReady = false;
+    let searchHistory = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
+
+    // ── providers ─────────────────────────────────────────────────────────
+    const PROVIDERS = {
+        anthropic:  { endpoint: 'https://api.anthropic.com/v1/messages',                                                      model: 'claude-3-7-sonnet-20250219',       placeholder: 'sk-ant-...' },
+        groq:       { endpoint: 'https://api.groq.com/openai/v1/chat/completions',                                             model: 'llama-3.3-70b-versatile',          placeholder: 'gsk_...'    },
+        gemini:     { endpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',    model: 'gemini-1.5-flash',                 placeholder: 'AIza...'    },
+        openrouter: { endpoint: 'https://openrouter.ai/api/v1/chat/completions',                                               model: 'google/gemini-2.0-flash-exp:free', placeholder: 'sk-or-...'  }
+    };
+
+    // ── UI refs ───────────────────────────────────────────────────────────
+    const $ = id => document.getElementById(id);
+    const ui = {
+        provider:     $('provider-select'),
+        apiKey:       $('api-key'),
+        keyWarn:      $('api-key-warning'),
+        query:        $('query-input'),
+        searchBtn:    $('search-btn'),
+        status:       $('status-msg'),
+        progressBar:  $('progress-bar'),
+        progressFill: $('progress-fill'),
+        progressPct:  $('progress-pct'),
+        results:      $('results-container'),
+        overlay:      $('loading-overlay'),
+        overlayTxt:   $('overlay-status'),
+        history:      $('history-container'),
+    };
+
+    // ── api key persistence ────────────────────────────────────────────────
+    ui.provider.addEventListener('change', () => {
+        const p = ui.provider.value;
+        ui.apiKey.placeholder = PROVIDERS[p].placeholder;
+        const saved = localStorage.getItem(`api_key_${p}`) || '';
+        ui.apiKey.value = saved;
+        ui.keyWarn.classList.toggle('hidden', !saved);
+    });
+    ui.apiKey.addEventListener('input', () => {
+        const p = ui.provider.value;
+        localStorage.setItem(`api_key_${p}`, ui.apiKey.value);
+        ui.keyWarn.classList.toggle('hidden', !ui.apiKey.value);
+    });
+    const _initKey = localStorage.getItem(`api_key_${ui.provider.value}`) || '';
+    ui.apiKey.value = _initKey;
+    if (_initKey) ui.keyWarn.classList.remove('hidden');
+
+    // ── hash ──────────────────────────────────────────────────────────────
+    async function hashStr(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0,16);
+    }
+
+    // ── indexeddb ─────────────────────────────────────────────────────────
+    function openDB() {
+        return new Promise((res, rej) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME))
+                    db.createObjectStore(STORE_NAME, { keyPath: 'url' });
+            };
+            req.onsuccess = e => res(e.target.result);
+            req.onerror   = e => rej(e.target.error);
         });
-
-        ui.apiKey.addEventListener('input', () => {
-            const p = ui.provider.value;
-            localStorage.setItem(`api_key_${p}`, ui.apiKey.value);
-            ui.keyWarn.classList.toggle('hidden', !ui.apiKey.value);
+    }
+    async function dbGetAll() {
+        const db = await openDB();
+        return new Promise((res, rej) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const req = tx.objectStore(STORE_NAME).getAll();
+            req.onsuccess = () => res(req.result);
+            req.onerror   = () => rej(req.error);
         });
+    }
+    async function dbSave(items) {
+        const db = await openDB();
+        return new Promise((res, rej) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            items.forEach(item => store.put(item));
+            tx.oncomplete = res;
+            tx.onerror    = () => rej(tx.error);
+        });
+    }
+    async function dbClear() {
+        const db = await openDB();
+        return new Promise((res, rej) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).clear();
+            tx.oncomplete = res;
+            tx.onerror    = () => rej(tx.error);
+        });
+    }
 
-        // restore on load
-        const _initKey = localStorage.getItem(`api_key_${ui.provider.value}`) || '';
-        ui.apiKey.value = _initKey;
-        if (_initKey) ui.keyWarn.classList.remove('hidden');
+    // ── similarity ────────────────────────────────────────────────────────
+    function cosine(a, b) {
+        let dot = 0, ma = 0, mb = 0;
+        for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; ma += a[i]*a[i]; mb += b[i]*b[i]; }
+        return dot / (Math.sqrt(ma) * Math.sqrt(mb));
+    }
 
-        // ── hash ──────────────────────────────────────────────────────────────
-        async function hashStr(str) {
-            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-            return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').slice(0, 16);
-        }
+    // ── status / progress ─────────────────────────────────────────────────
+    function setStatus(msg, type = 'muted') {
+        ui.status.dataset.type = type;
+        ui.status.innerText = msg;
+    }
+    function showProg(pct) {
+        const c = Math.min(Math.max(pct, 0), 100);
+        const f = Math.round(c / 10);
+        ui.progressFill.textContent = '█'.repeat(f) + '░'.repeat(10 - f);
+        ui.progressPct.innerText = `${Math.round(c)}%`;
+        ui.progressBar.classList.remove('hidden');
+    }
+    function hideProg() { ui.progressBar.classList.add('hidden'); }
 
-        // ── indexeddb ─────────────────────────────────────────────────────────
-        function openDB() {
-            return new Promise((res, rej) => {
-                const req = indexedDB.open(DB_NAME, DB_VERSION);
-                req.onupgradeneeded = e => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME))
-                        db.createObjectStore(STORE_NAME, { keyPath: 'url' });
-                };
-                req.onsuccess = e => res(e.target.result);
-                req.onerror   = e => rej(e.target.error);
+    // ── history ───────────────────────────────────────────────────────────
+    function saveHistory() { localStorage.setItem(HIST_KEY, JSON.stringify(searchHistory)); }
+
+    function addHistory(q) {
+        searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, MAX_HIST);
+        saveHistory(); renderHistory();
+    }
+    function removeHistory(q) {
+        searchHistory = searchHistory.filter(h => h !== q);
+        saveHistory(); renderHistory();
+    }
+    function renderHistory() {
+        if (!searchHistory.length) { ui.history.classList.add('hidden'); return; }
+        ui.history.classList.remove('hidden');
+        ui.history.innerHTML =
+            '<span class="hist-label">RECENTES:</span>' +
+            searchHistory.map(q => {
+                const s = q.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+                return `<span class="hist-pill"><button class="hist-text" data-q="${s}">${s}</button>` +
+                       `<button class="hist-rm" data-q="${s}" title="Remover">&#xD7;</button></span>`;
+            }).join('');
+        ui.history.querySelectorAll('.hist-text').forEach(b =>
+            b.addEventListener('click', () => { ui.query.value = b.dataset.q; ui.searchBtn.click(); }));
+        ui.history.querySelectorAll('.hist-rm').forEach(b =>
+            b.addEventListener('click', () => removeHistory(b.dataset.q)));
+    }
+
+    // ── init ──────────────────────────────────────────────────────────────
+    async function init() {
+        try {
+            setStatus('Carregando modelo de IA local...', 'info');
+            showProg(0);
+
+            extractor = await pipeline('feature-extraction', MODEL_NAME, {
+                progress_callback: p => {
+                    if ((p.status === 'progress' || p.status === 'download') && p.progress != null)
+                        showProg(p.progress);
+                    else if (p.status === 'done')
+                        showProg(100);
+                }
             });
-        }
 
-        async function dbGetAll() {
-            const db = await openDB();
-            return new Promise((res, rej) => {
-                const tx  = db.transaction(STORE_NAME, 'readonly');
-                const req = tx.objectStore(STORE_NAME).getAll();
-                req.onsuccess = () => res(req.result);
-                req.onerror   = () => rej(req.error);
-            });
-        }
+            hideProg();
+            setStatus('Carregando base de dados...', 'info');
 
-        async function dbSave(items) {
-            const db = await openDB();
-            return new Promise((res, rej) => {
-                const tx    = db.transaction(STORE_NAME, 'readwrite');
-                const store = tx.objectStore(STORE_NAME);
-                items.forEach(item => store.put(item));
-                tx.oncomplete = res;
-                tx.onerror    = () => rej(tx.error);
-            });
-        }
+            let response;
+            for (const path of ['data/repos.json', 'data/repos_enriched.json']) {
+                try { const r = await fetch(path); if (r.ok) { response = r; break; } } catch {}
+            }
+            if (!response) throw new Error('JSON nao encontrado.');
 
-        async function dbClear() {
-            const db = await openDB();
-            return new Promise((res, rej) => {
-                const tx = db.transaction(STORE_NAME, 'readwrite');
-                tx.objectStore(STORE_NAME).clear();
-                tx.oncomplete = res;
-                tx.onerror    = () => rej(tx.error);
-            });
-        }
+            const reposText  = await response.text();
+            const currHash   = await hashStr(reposText);
+            const storedHash = localStorage.getItem('repos_hash');
 
-        // ── similarity ────────────────────────────────────────────────────────
-        function cosine(a, b) {
-            let dot = 0, ma = 0, mb = 0;
-            for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; ma += a[i]*a[i]; mb += b[i]*b[i]; }
-            return dot / (Math.sqrt(ma) * Math.sqrt(mb));
-        }
+            if (storedHash !== currHash) {
+                setStatus('Nova versao — recalculando indice...', 'warn');
+                await dbClear();
+                localStorage.setItem('repos_hash', currHash);
+            }
 
-        // ── status / progress ─────────────────────────────────────────────────
-        function setStatus(msg, cls = 'text-gray-400') {
-            ui.status.className = `mt-3 text-xs font-medium text-center italic ${cls}`;
-            ui.status.innerText = msg;
-        }
+            reposData = JSON.parse(reposText);
 
-        function showProg(pct) {
-            ui.progressBar.classList.remove('hidden');
-            ui.progressFill.style.width = `${Math.min(pct, 100)}%`;
-            ui.progressPct.innerText    = `${Math.round(pct)}%`;
-        }
+            const cached    = await dbGetAll();
+            const cachedMap = new Map(cached.map(c => [c.url, c.embedding]));
+            const toEmbed   = reposData.filter(r => !cachedMap.has(r.url));
 
-        function hideProg() { ui.progressBar.classList.add('hidden'); }
-
-        // ── search history ────────────────────────────────────────────────────
-        function saveHistory() {
-            localStorage.setItem(HIST_KEY, JSON.stringify(searchHistory));
-        }
-
-        function addHistory(q) {
-            searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, MAX_HIST);
-            saveHistory();
-            renderHistory();
-        }
-
-        function removeHistory(q) {
-            searchHistory = searchHistory.filter(h => h !== q);
-            saveHistory();
-            renderHistory();
-        }
-
-        function renderHistory() {
-            if (!searchHistory.length) { ui.history.classList.add('hidden'); return; }
-            ui.history.classList.remove('hidden');
-            ui.history.innerHTML =
-                '<span class="text-xs text-gray-400 self-center shrink-0">Recentes:</span>' +
-                searchHistory.map(q => {
-                    const safe = q.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-                    return `<span class="inline-flex items-center border border-gray-200 bg-gray-100 overflow-hidden text-xs rounded-full">` +
-                        `<button class="hist-text text-gray-500 hover:bg-blue-50 hover:text-blue-600 px-3 py-1 transition-colors" data-q="${safe}">${safe}</button>` +
-                        `<button class="hist-rm text-gray-300 hover:text-red-400 hover:bg-red-50 px-2 py-1 transition-colors border-l border-gray-200 leading-none" data-q="${safe}" title="Remover">×</button>` +
-                        `</span>`;
-                }).join('');
-            ui.history.querySelectorAll('.hist-text').forEach(btn =>
-                btn.addEventListener('click', () => { ui.query.value = btn.dataset.q; ui.searchBtn.click(); })
-            );
-            ui.history.querySelectorAll('.hist-rm').forEach(btn =>
-                btn.addEventListener('click', () => removeHistory(btn.dataset.q))
-            );
-        }
-
-        // ── init ──────────────────────────────────────────────────────────────
-        async function init() {
-            try {
-                setStatus('Carregando modelo de IA local...', 'text-blue-500');
+            if (toEmbed.length > 0) {
                 showProg(0);
-
-                extractor = await pipeline('feature-extraction', MODEL_NAME, {
-                    progress_callback: p => {
-                        if ((p.status === 'progress' || p.status === 'download') && p.progress != null)
-                            showProg(p.progress);
-                        else if (p.status === 'done')
-                            showProg(100);
+                const batch = [];
+                for (let i = 0; i < toEmbed.length; i++) {
+                    const r   = toEmbed[i];
+                    const txt = `${r.name} ${r.desc || ''} ${r.category || ''} ${r.lang || ''}`;
+                    const out = await extractor(txt, { pooling: 'mean', normalize: true });
+                    const emb = Array.from(out.data);
+                    batch.push({ url: r.url, embedding: emb });
+                    r.embedding = emb;
+                    const pct = ((i + 1) / toEmbed.length) * 100;
+                    if (i % 15 === 0 || i === toEmbed.length - 1) {
+                        showProg(pct);
+                        setStatus(`Indexando: ${i + 1} / ${toEmbed.length}`, 'info');
                     }
-                });
-
-                hideProg();
-                setStatus('Carregando base de dados...', 'text-blue-500');
-
-                let response;
-                // data/ lives inside docs/ so it's served by GitHub Pages
-                for (const path of ['data/repos.json', 'data/repos_enriched.json']) {
-                    try { const r = await fetch(path); if (r.ok) { response = r; break; } } catch {}
                 }
-                if (!response) throw new Error('JSON não encontrado.');
+                await dbSave(batch);
+            }
 
-                const reposText  = await response.text();
-                const currHash   = await hashStr(reposText);
-                const storedHash = localStorage.getItem('repos_hash');
+            reposData.forEach(r => { if (!r.embedding) r.embedding = cachedMap.get(r.url); });
 
-                if (storedHash !== currHash) {
-                    setStatus('Nova versão detectada — recalculando índice...', 'text-amber-500');
-                    await dbClear();
-                    localStorage.setItem('repos_hash', currHash);
-                }
+            isReady = true;
+            hideProg();
+            setStatus('>> pronto para buscar', 'success');
+            renderHistory();
+        } catch (err) {
+            hideProg();
+            setStatus('ERRO: ' + err.message, 'error');
+            console.error(err);
+        }
+    }
 
-                reposData = JSON.parse(reposText);
+    // ── llm (non-streaming) ───────────────────────────────────────────────
+    async function callLLM(provider, apiKey, system, userContent) {
+        const cfg = PROVIDERS[provider];
+        const headers = { 'Content-Type': 'application/json' };
 
-                const cached    = await dbGetAll();
-                const cachedMap = new Map(cached.map(c => [c.url, c.embedding]));
-                const toEmbed   = reposData.filter(r => !cachedMap.has(r.url));
+        if (provider === 'anthropic') {
+            Object.assign(headers, { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' });
+            const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, max_tokens: 2000, system, messages: [{ role: 'user', content: userContent }] }) });
+            return (await res.json()).content?.[0]?.text ?? '';
+        }
+        if (provider === 'gemini') {
+            const res = await fetch(`${cfg.endpoint}?key=${apiKey}`, { method: 'POST', headers, body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${userContent}` }] }] }) });
+            return (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        }
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }] }) });
+        return (await res.json()).choices?.[0]?.message?.content ?? '';
+    }
 
-                if (toEmbed.length > 0) {
-                    showProg(0);
-                    const batch = [];
-                    for (let i = 0; i < toEmbed.length; i++) {
-                        const r    = toEmbed[i];
-                        const text = `${r.name} ${r.desc || ''} ${r.category || ''} ${r.lang || ''}`;
-                        const out  = await extractor(text, { pooling: 'mean', normalize: true });
-                        const emb  = Array.from(out.data);
-                        batch.push({ url: r.url, embedding: emb });
-                        r.embedding = emb;
-
-                        const pct = ((i + 1) / toEmbed.length) * 100;
-                        if (i % 15 === 0 || i === toEmbed.length - 1) {
-                            showProg(pct);
-                            setStatus(`Indexando: ${i + 1} / ${toEmbed.length}`, 'text-blue-500');
-                        }
-                    }
-                    await dbSave(batch);
-                }
-
-                reposData.forEach(r => { if (!r.embedding) r.embedding = cachedMap.get(r.url); });
-
-                isReady = true;
-                hideProg();
-                setStatus('✦ pronto para buscar', 'text-green-600');
-                renderHistory();
-            } catch (err) {
-                hideProg();
-                setStatus('Erro: ' + err.message, 'text-red-600');
-                console.error(err);
+    // ── streaming ─────────────────────────────────────────────────────────
+    async function streamSSE(res, onEvent) {
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const d = line.slice(6).trim();
+                if (d === '[DONE]') continue;
+                try { onEvent(JSON.parse(d)); } catch {}
             }
         }
+    }
+    async function callLLMStream(provider, apiKey, system, userContent, onToken) {
+        const cfg = PROVIDERS[provider];
+        const headers = { 'Content-Type': 'application/json' };
+        let full = '';
+        const emit = t => { full += t; onToken(t); };
 
-        // ── llm ───────────────────────────────────────────────────────────────
-        async function callLLM(provider, apiKey, system, userContent) {
-            const cfg     = PROVIDERS[provider];
-            const headers = { 'Content-Type': 'application/json' };
-
-            if (provider === 'anthropic') {
-                Object.assign(headers, {
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true'
-                });
-                const res  = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, max_tokens: 2000, system, messages: [{ role: 'user', content: userContent }] }) });
-                const data = await res.json();
-                return data.content?.[0]?.text ?? '';
-            }
-
-            if (provider === 'gemini') {
-                const res  = await fetch(`${cfg.endpoint}?key=${apiKey}`, { method: 'POST', headers, body: JSON.stringify({ contents: [{ parts: [{ text: `${system}\n\n${userContent}` }] }] }) });
-                const data = await res.json();
-                return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-            }
-
-            // groq / openrouter — openai format
-            headers['Authorization'] = `Bearer ${apiKey}`;
-            const res  = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }] }) });
-            const data = await res.json();
-            return data.choices?.[0]?.message?.content ?? '';
+        if (provider === 'anthropic') {
+            Object.assign(headers, { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' });
+            const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, max_tokens: 2000, stream: true, system, messages: [{ role: 'user', content: userContent }] }) });
+            await streamSSE(res, ev => { if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') emit(ev.delta.text); });
+            return full;
         }
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({ model: cfg.model, stream: true, messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }] }) });
+        await streamSSE(res, ev => { const t = ev.choices?.[0]?.delta?.content; if (t) emit(t); });
+        return full;
+    }
 
-        // ── streaming ─────────────────────────────────────────────────────────
-        async function streamSSE(res, onEvent) {
-            const reader = res.body.getReader();
-            const dec = new TextDecoder();
-            let buf = '';
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                buf += dec.decode(value, { stream: true });
-                const lines = buf.split('\n');
-                buf = lines.pop();
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    const d = line.slice(6).trim();
-                    if (d === '[DONE]') continue;
-                    try { onEvent(JSON.parse(d)); } catch {}
-                }
-            }
-        }
+    // ── agent ─────────────────────────────────────────────────────────────
+    async function runAgent(query) {
+        const provider = ui.provider.value;
+        const apiKey   = ui.apiKey.value.trim();
+        if (!apiKey) return alert('Insira a API Key.');
 
-        async function callLLMStream(provider, apiKey, system, userContent, onToken) {
-            const cfg = PROVIDERS[provider];
-            const headers = { 'Content-Type': 'application/json' };
-            let fullText = '';
-            const emit = t => { fullText += t; onToken(t); };
+        ui.overlay.classList.remove('hidden');
+        ui.results.innerHTML = '';
+        addHistory(query);
 
-            if (provider === 'anthropic') {
-                Object.assign(headers, {
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'anthropic-dangerous-direct-browser-access': 'true'
-                });
-                const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({
-                    model: cfg.model, max_tokens: 2000, stream: true, system,
-                    messages: [{ role: 'user', content: userContent }]
-                })});
-                await streamSSE(res, ev => {
-                    if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta')
-                        emit(ev.delta.text);
-                });
-                return fullText;
-            }
+        try {
+            ui.overlayTxt.innerText = 'buscando similaridade...';
+            setStatus('buscando similaridade...', 'info');
 
-            // openrouter — openai-compatible streaming
-            headers['Authorization'] = `Bearer ${apiKey}`;
-            const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({
-                model: cfg.model, stream: true,
-                messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }]
-            })});
-            await streamSSE(res, ev => {
-                const t = ev.choices?.[0]?.delta?.content;
-                if (t) emit(t);
-            });
-            return fullText;
-        }
+            const qOut = await extractor(query, { pooling: 'mean', normalize: true });
+            const qEmb = Array.from(qOut.data);
+            const localResults = reposData
+                .filter(r => r.embedding)
+                .map(r => ({ ...r, sim: cosine(qEmb, r.embedding) }))
+                .sort((a, b) => b.sim - a.sim)
+                .slice(0, MAX_LOCAL);
 
-        // ── agent ─────────────────────────────────────────────────────────────
-        async function runAgent(query) {
-            const provider = ui.provider.value;
-            const apiKey   = ui.apiKey.value.trim();
-            if (!apiKey) return alert('Insira a API Key.');
+            ui.overlayTxt.innerText = 'consultando IA...';
+            setStatus('consultando IA...', 'info');
 
-            ui.overlay.classList.remove('hidden');
-            ui.results.innerHTML = '';
-            addHistory(query);
-
-            try {
-                // step 1 — local similarity
-                ui.overlayTxt.innerText = 'buscando similaridade...';
-                setStatus('🔍 buscando similaridade...', 'text-blue-500');
-
-                const qOut = await extractor(query, { pooling: 'mean', normalize: true });
-                const qEmb = Array.from(qOut.data);
-
-                const localResults = reposData
-                    .filter(r => r.embedding)
-                    .map(r => ({ ...r, sim: cosine(qEmb, r.embedding) }))
-                    .sort((a, b) => b.sim - a.sim)
-                    .slice(0, MAX_LOCAL);
-
-                // step 2 — LLM
-                ui.overlayTxt.innerText = 'consultando IA...';
-                setStatus('🤖 consultando IA...', 'text-purple-500');
-
-                const system = `Você é um agente especialista nos repositórios da coleção chaoticravena/github-trending-site. Baseie suas recomendações exclusivamente nos repos locais. Seja direto — explique por que cada repo se encaixa na ideia do usuário. Responda sempre em português.
+            const system = `Você é um agente especialista nos repositórios da coleção chaoticravena/github-trending-site. Baseie suas recomendações exclusivamente nos repos locais. Seja direto — explique por que cada repo se encaixa na ideia do usuário. Responda sempre em português.
 
 Retorne APENAS um array JSON válido com até 6 objetos no formato:
 [ { "name": "owner/repo", "url": "...", "desc": "...", "reason": "..." } ]`;
 
-                const context = localResults.map(r => ({
-                    name:     r.name,
-                    url:      r.url,
-                    desc:     r.desc     || '',
-                    category: r.category || '',
-                    rating:   r.rating   || '',
-                    days:     r.days     || 0,
-                    lang:     r.lang     || ''
-                }));
+            const context = localResults.map(r => ({
+                name: r.name, url: r.url, desc: r.desc || '',
+                category: r.category || '', rating: r.rating || '',
+                days: r.days || 0, lang: r.lang || ''
+            }));
+            const userContent = `Usuário quer: "${query}"\n\nRepositórios locais mais similares (${localResults.length}):\n${JSON.stringify(context, null, 2)}`;
 
-                const userContent = `Usuário quer: "${query}"\n\nRepositórios locais mais similares (${localResults.length}):\n${JSON.stringify(context, null, 2)}`;
+            let raw;
 
-                let raw;
-
-                if (STREAMING_PROVIDERS.has(provider)) {
-                    // hide spinner — we'll show the live stream instead
-                    ui.overlay.classList.add('hidden');
-
-                    // terminal-style streaming box
-                    ui.results.innerHTML = `
-                        <div id="stream-box" class="rounded-xl overflow-hidden shadow-sm border border-gray-200 mb-3">
-                            <div class="bg-gray-800 px-4 py-2.5 flex items-center justify-between">
-                                <div class="flex gap-1.5">
-                                    <span class="w-3 h-3 rounded-full bg-red-400"></span>
-                                    <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
-                                    <span class="w-3 h-3 rounded-full bg-green-400"></span>
-                                </div>
-                                <span class="text-xs text-gray-400 font-mono">resposta da IA</span>
-                                <span class="text-xs text-green-400 font-mono flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block"></span>live
-                                </span>
-                            </div>
-                            <div id="stream-text"
-                                 class="bg-gray-900 p-4 font-mono text-sm text-gray-300 whitespace-pre-wrap leading-relaxed min-h-[80px] max-h-[280px] overflow-y-auto">
-                            </div>
-                        </div>`;
-
-                    const streamEl = document.getElementById('stream-text');
-                    const cursor = document.createElement('span');
-                    cursor.className = 'stream-cursor';
-                    streamEl.appendChild(cursor);
-
-                    raw = await callLLMStream(provider, apiKey, system, userContent, text => {
-                        cursor.insertAdjacentText('beforebegin', text);
-                        streamEl.scrollTop = streamEl.scrollHeight;
-                    });
-
-                    document.getElementById('stream-box')?.remove();
-                } else {
-                    raw = await callLLM(provider, apiKey, system, userContent);
-                }
-
-                // step 3 — parse and render
-                const match = raw.match(/\[[\s\S]*\]/);
-                const repos  = match ? JSON.parse(match[0]) : [];
-                renderResults(repos);
-                setStatus('✦ pronto', 'text-green-600');
-            } catch (err) {
-                setStatus('Erro: ' + err.message, 'text-red-600');
-                ui.results.innerHTML = `<div class="text-center text-red-500 py-8 text-sm">Erro: ${err.message}</div>`;
-                console.error(err);
-            } finally {
+            if (STREAMING_PROVIDERS.has(provider)) {
                 ui.overlay.classList.add('hidden');
-                ui.overlayTxt.innerText = '';
-            }
-        }
-
-        // ── render ────────────────────────────────────────────────────────────
-        function renderResults(repos) {
-            if (!repos.length) {
-                ui.results.innerHTML = '<p class="text-center text-gray-400 py-10 text-sm">Nenhum resultado encontrado.</p>';
-                return;
-            }
-            ui.results.innerHTML = repos.map((r, i) => `
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="flex justify-between items-start gap-3 mb-2">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span class="shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center">${i+1}</span>
-                            <h3 class="font-bold text-blue-600 truncate"><a href="${r.url}" target="_blank" class="hover:underline">${r.name}</a></h3>
+                ui.results.innerHTML = `
+                    <div id="stream-box" class="stream-win">
+                        <div class="stream-win-bar">
+                            <span class="stream-win-title">AI_RESPONSE.EXE</span>
+                            <span class="stream-win-live">&#9679; LIVE</span>
+                            <span class="stream-win-close">&#x2715;</span>
                         </div>
-                        <span class="shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700">Local</span>
-                    </div>
-                    <p class="text-gray-500 text-sm mb-3 leading-relaxed">${r.desc || ''}</p>
-                    <div class="bg-blue-50 px-4 py-2.5 rounded-lg border-l-4 border-blue-400 text-sm text-blue-800 leading-relaxed"><strong>Por que:</strong> ${r.reason}</div>
-                </div>
-            `).join('');
+                        <div id="stream-text" class="stream-win-body"></div>
+                    </div>`;
+                const el = $('stream-text');
+                const cur = document.createElement('span');
+                cur.className = 'stream-cursor';
+                el.appendChild(cur);
+                raw = await callLLMStream(provider, apiKey, system, userContent, t => {
+                    cur.insertAdjacentText('beforebegin', t);
+                    el.scrollTop = el.scrollHeight;
+                });
+                $('stream-box')?.remove();
+            } else {
+                raw = await callLLM(provider, apiKey, system, userContent);
+            }
+
+            const match = raw.match(/\[[\s\S]*\]/);
+            renderResults(match ? JSON.parse(match[0]) : []);
+            setStatus('>> pronto', 'success');
+        } catch (err) {
+            setStatus('ERRO: ' + err.message, 'error');
+            ui.results.innerHTML = `<div class="empty-win"><div class="empty-titlebar"><span class="empty-title">ERRO</span><span class="result-close">&#x2715;</span></div><div class="empty-body"><div class="empty-ico">&#x26A0;</div><p class="empty-msg">${err.message}</p></div></div>`;
+            console.error(err);
+        } finally {
+            ui.overlay.classList.add('hidden');
+            ui.overlayTxt.innerText = '';
         }
+    }
 
-        // ── events ────────────────────────────────────────────────────────────
-        ui.searchBtn.addEventListener('click', () => {
-            const q = ui.query.value.trim();
-            if (!q) return;
-            if (!isReady) { setStatus('Aguarde o sistema carregar...', 'text-amber-500'); return; }
-            runAgent(q);
-        });
+    // ── render results ────────────────────────────────────────────────────
+    function renderResults(repos) {
+        if (!repos.length) {
+            ui.results.innerHTML = `<div class="empty-win"><div class="empty-titlebar"><span class="empty-title">ERROR — 0 results</span><span class="result-close">&#x2715;</span></div><div class="empty-body"><div class="empty-ico">&#x26A0;</div><p class="empty-msg">Nenhum resultado encontrado.</p></div></div>`;
+            return;
+        }
+        ui.results.innerHTML = repos.map((r, i) => `
+            <div class="result-card">
+                <div class="result-titlebar">
+                    <span class="result-num">[${String(i+1).padStart(2,'0')}]</span>
+                    <a href="${r.url}" target="_blank" class="result-name">${r.name}</a>
+                    <span class="result-close">&#x2715;</span>
+                </div>
+                <div class="result-body">
+                    <p class="result-desc">${r.desc || ''}</p>
+                    <div class="result-reason">
+                        <div class="result-reason-label">&#x25B6; POR QUE</div>
+                        <div class="result-reason-body">${r.reason}</div>
+                    </div>
+                </div>
+            </div>`).join('');
+    }
 
-        ui.query.addEventListener('keypress', e => { if (e.key === 'Enter') ui.searchBtn.click(); });
+    // ── events ────────────────────────────────────────────────────────────
+    ui.searchBtn.addEventListener('click', () => {
+        const q = ui.query.value.trim();
+        if (!q) return;
+        if (!isReady) { setStatus('Aguarde o sistema carregar...', 'warn'); return; }
+        runAgent(q);
+    });
+    ui.query.addEventListener('keypress', e => { if (e.key === 'Enter') ui.searchBtn.click(); });
 
-        init();
-    </script>
+    init();
+</script>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans text-gray-900">
-    <a href="../index.html" class="back-btn">&#8592; voltar</a>
-    <div class="max-w-3xl mx-auto px-4 py-10">
+<body class="min-h-screen">
+<a href="../index.html" class="back-btn">&#8592; voltar</a>
+<div class="max-w-3xl mx-auto px-4 py-12">
 
-        <header class="text-center mb-8">
-            <h1 class="text-2xl font-black tracking-tight mb-1">
-                chaoticravena/repos <span class="text-blue-500">✦</span> agente
-            </h1>
-            <p class="text-gray-400 text-sm">descreve teu projeto e eu indico os repos certos da coleção</p>
-        </header>
-
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-6">
-
-            <!-- provider + api key -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Provedor de IA</label>
-                    <select id="provider-select" class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="anthropic">Claude (Anthropic)</option>
-                        <option value="groq">Groq (Llama 3.3)</option>
-                        <option value="gemini">Google Gemini 1.5</option>
-                        <option value="openrouter">OpenRouter (Free)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">API Key</label>
-                    <input type="password" id="api-key" placeholder="sk-ant-..."
-                           class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                    <p id="api-key-warning" class="hidden text-xs text-amber-500 mt-1 flex items-center gap-1">
-                        <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-                        chave salva localmente no seu browser
-                    </p>
-                </div>
+    <header class="mb-6">
+        <div class="win-bar">
+            <div class="win-dots">
+                <span class="win-dot close"></span>
+                <span class="win-dot"></span>
+                <span class="win-dot"></span>
             </div>
-
-            <!-- search bar -->
-            <div class="flex gap-2">
-                <input type="text" id="query-input" placeholder="O que você quer construir?"
-                       class="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="search-btn"
-                        class="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold text-sm hover:bg-blue-700 active:scale-95 transition-all">
-                    Buscar
-                </button>
-            </div>
-
-            <!-- search history -->
-            <div id="history-container" class="hidden flex flex-wrap gap-2 mt-3 items-center"></div>
-
-            <!-- progress bar -->
-            <div id="progress-bar" class="hidden mt-4 px-1">
-                <div class="flex justify-between text-xs text-gray-400 mb-1">
-                    <span class="italic">Carregando modelo</span>
-                    <span id="progress-pct" class="font-mono">0%</span>
-                </div>
-                <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                    <div id="progress-fill"
-                         class="bg-blue-500 h-1.5 rounded-full transition-all duration-150 ease-out"
-                         style="width:0%"></div>
-                </div>
-            </div>
-
-            <!-- status line -->
-            <p id="status-msg" class="mt-3 text-xs font-medium text-center italic text-gray-400">Inicializando sistema...</p>
+            <span class="win-bar-title">chaoticravena/repos — agent.exe</span>
         </div>
+        <h1>chaoticravena/repos</h1>
+        <p class="agent-tag">&#x2756; AGENTE AI</p>
+        <p class="sub">descreve teu projeto &middot; eu indico os repos certos da coleção</p>
+    </header>
 
-        <!-- results -->
-        <div id="results-container" class="grid gap-3"></div>
-    </div>
-
-    <!-- loading overlay -->
-    <div id="loading-overlay"
-         class="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
-        <div class="text-center">
-            <div class="animate-spin rounded-full h-9 w-9 border-2 border-gray-200 border-t-blue-600 mx-auto mb-3"></div>
-            <p id="overlay-status" class="text-sm font-medium text-gray-500 tracking-wide"></p>
+    <!-- config -->
+    <div class="config-panel">
+        <div class="panel-bar teal">
+            <span class="panel-bar-title">CONFIG.INI</span>
+            <span class="panel-xbtn">&#x2715;</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+            <div>
+                <div class="field-label">Provedor de IA</div>
+                <select id="provider-select">
+                    <option value="anthropic">Claude (Anthropic)</option>
+                    <option value="groq">Groq (Llama 3.3)</option>
+                    <option value="gemini">Google Gemini 1.5</option>
+                    <option value="openrouter">OpenRouter (Free)</option>
+                </select>
+            </div>
+            <div>
+                <div class="field-label">API Key</div>
+                <input type="password" id="api-key" placeholder="sk-ant-...">
+                <p id="api-key-warning" class="key-warn hidden">&#9654; chave salva localmente no browser</p>
+            </div>
         </div>
     </div>
+
+    <!-- search -->
+    <div class="search-panel">
+        <div class="panel-bar pink">
+            <span class="panel-bar-title">BUSCA.EXE</span>
+            <span class="panel-xbtn">&#x2715;</span>
+        </div>
+        <div class="terminal-row">
+            <span class="terminal-prompt">C:\repos&gt;</span>
+            <input type="text" id="query-input" placeholder="o que voce quer construir?">
+            <button id="search-btn">BUSCAR</button>
+        </div>
+        <div id="history-container" class="history-row hidden"></div>
+        <div id="progress-bar" class="progress-box hidden">
+            <div class="progress-label">CARREGANDO</div>
+            <div class="progress-track">
+                <span id="progress-fill" class="progress-blocks">&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;&#x2591;</span>
+                <span id="progress-pct" class="progress-pct">0%</span>
+            </div>
+        </div>
+        <p id="status-msg" class="status-line" data-type="muted">Inicializando sistema...</p>
+    </div>
+
+    <!-- results -->
+    <div id="results-container" class="grid gap-0"></div>
+</div>
+
+<!-- overlay -->
+<div id="loading-overlay" class="hidden">
+    <div class="overlay-box">
+        <div class="overlay-bar">
+            <span class="overlay-bar-title">PROCESSANDO</span>
+            <span class="overlay-xbtn">&#x2715;</span>
+        </div>
+        <div class="overlay-body">
+            <div class="overlay-dots">&#x2588; &#x2588; &#x2588;</div>
+            <p id="overlay-status">aguardando...</p>
+        </div>
+    </div>
+</div>
 </body>
 </html>
