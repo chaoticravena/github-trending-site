@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>chaoticravena/repos ✦ agente</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
@@ -16,6 +19,20 @@
             margin-left: 1px;
             animation: blink .8s step-start infinite;
         }
+        .back-btn {
+            position: fixed; top: 16px; left: 16px; z-index: 50;
+            font-family: 'Press Start 2P', monospace; font-size: 8px;
+            color: #ff6eb4; border: 2px solid #ff6eb4;
+            padding: 7px 11px; background: #0c0c0f;
+            box-shadow: 2px 2px 0 #00a896;
+            text-decoration: none; line-height: 1;
+            transition: box-shadow .08s, transform .08s, color .08s, border-color .08s;
+        }
+        .back-btn:hover {
+            box-shadow: 1px 1px 0 #00a896; transform: translate(1px,1px);
+            color: #00a896; border-color: #00a896;
+        }
+        .back-btn:active { box-shadow: none; transform: translate(2px,2px); }
     </style>
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
@@ -29,13 +46,14 @@
         const STORE_NAME = 'embeddings';
         const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
         const MAX_LOCAL  = 15;
-        const MAX_HIST   = 5;
+        const MAX_HIST   = 10;
+        const HIST_KEY   = 'agent_history';
 
         const STREAMING_PROVIDERS = new Set(['anthropic', 'openrouter']);
 
         // ── state ─────────────────────────────────────────────────────────────
         let extractor, reposData = [], isReady = false;
-        let searchHistory = JSON.parse(sessionStorage.getItem('search_history') || '[]');
+        let searchHistory = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
 
         // ── providers ─────────────────────────────────────────────────────────
         const PROVIDERS = {
@@ -156,9 +174,19 @@
         function hideProg() { ui.progressBar.classList.add('hidden'); }
 
         // ── search history ────────────────────────────────────────────────────
+        function saveHistory() {
+            localStorage.setItem(HIST_KEY, JSON.stringify(searchHistory));
+        }
+
         function addHistory(q) {
             searchHistory = [q, ...searchHistory.filter(h => h !== q)].slice(0, MAX_HIST);
-            sessionStorage.setItem('search_history', JSON.stringify(searchHistory));
+            saveHistory();
+            renderHistory();
+        }
+
+        function removeHistory(q) {
+            searchHistory = searchHistory.filter(h => h !== q);
+            saveHistory();
             renderHistory();
         }
 
@@ -167,11 +195,18 @@
             ui.history.classList.remove('hidden');
             ui.history.innerHTML =
                 '<span class="text-xs text-gray-400 self-center shrink-0">Recentes:</span>' +
-                searchHistory.map(q =>
-                    `<button class="hist text-xs bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500 px-3 py-1 rounded-full border border-gray-200 transition-colors">${q}</button>`
-                ).join('');
-            ui.history.querySelectorAll('.hist').forEach(btn =>
-                btn.addEventListener('click', () => { ui.query.value = btn.textContent; ui.searchBtn.click(); })
+                searchHistory.map(q => {
+                    const safe = q.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+                    return `<span class="inline-flex items-center border border-gray-200 bg-gray-100 overflow-hidden text-xs rounded-full">` +
+                        `<button class="hist-text text-gray-500 hover:bg-blue-50 hover:text-blue-600 px-3 py-1 transition-colors" data-q="${safe}">${safe}</button>` +
+                        `<button class="hist-rm text-gray-300 hover:text-red-400 hover:bg-red-50 px-2 py-1 transition-colors border-l border-gray-200 leading-none" data-q="${safe}" title="Remover">×</button>` +
+                        `</span>`;
+                }).join('');
+            ui.history.querySelectorAll('.hist-text').forEach(btn =>
+                btn.addEventListener('click', () => { ui.query.value = btn.dataset.q; ui.searchBtn.click(); })
+            );
+            ui.history.querySelectorAll('.hist-rm').forEach(btn =>
+                btn.addEventListener('click', () => removeHistory(btn.dataset.q))
             );
         }
 
@@ -469,6 +504,7 @@ Retorne APENAS um array JSON válido com até 6 objetos no formato:
     </script>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-gray-900">
+    <a href="../index.html" class="back-btn">&#8592; voltar</a>
     <div class="max-w-3xl mx-auto px-4 py-10">
 
         <header class="text-center mb-8">
