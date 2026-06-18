@@ -1,7 +1,7 @@
 """
 generate_data.py  [source_md_or_json]  [json_out]
 
-  source   - .md or .json filename inside data/  (default: repos_2023_2024_enriched.md)
+  source   - .md or .json filename inside data/  (default: repos_enriched.json)
   json_out - path relative to project root        (default: data/repos.json)
 
 Assigns granular category labels, writes JSON + docs/index.html.
@@ -133,89 +133,351 @@ HTML_TEMPLATE = """\
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>__TITLE__ · Python &amp; JS</title>
+<title>chaoticravena/repos · __TITLE__ · Python &amp; JS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0d1117;--surface:#161b22;--border:#30363d;
-    --text:#e6edf3;--muted:#8b949e;
-    --accent:#58a6ff;--high:#ff7b72;--med:#d29922;--low:#8b949e;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font:14px/1.6 'Segoe UI',system-ui,sans-serif;min-height:100vh}
-  a{color:var(--accent);text-decoration:none}
-  a:hover{text-decoration:underline}
-  header{padding:2rem 1.5rem 1rem;border-bottom:1px solid var(--border)}
-  header h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem}
-  header p{color:var(--muted);font-size:.85rem}
-  .stats{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;
-        padding:.5rem 1rem;font-size:.8rem;color:var(--muted)}
-  .stat span{font-weight:700;color:var(--text);font-size:1rem}
-  .controls{display:flex;gap:.75rem;flex-wrap:wrap;padding:1rem 1.5rem;
-            border-bottom:1px solid var(--border);align-items:center}
-  input,select{background:var(--surface);border:1px solid var(--border);
-               color:var(--text);border-radius:6px;padding:.4rem .75rem;font-size:.85rem}
-  input{flex:1;min-width:180px}
-  input:focus,select:focus{outline:none;border-color:var(--accent)}
-  .count{color:var(--muted);font-size:.8rem;margin-left:auto}
-  .table-wrap{overflow-x:auto;padding:0 1.5rem 2rem}
-  table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.82rem}
-  th{position:sticky;top:0;background:var(--bg);border-bottom:2px solid var(--border);
-     padding:.5rem .75rem;text-align:left;color:var(--muted);cursor:pointer;
-     user-select:none;white-space:nowrap}
-  th:hover{color:var(--text)}
-  th.sort-asc::after{content:" ▲"}
-  th.sort-desc::after{content:" ▼"}
-  td{padding:.45rem .75rem;border-bottom:1px solid var(--border);vertical-align:top}
-  tr:hover td{background:var(--surface)}
-  .rank{color:var(--muted);width:42px}
-  .days{font-weight:600;width:60px}
-  .desc{color:var(--muted);max-width:340px}
-  .lang-py{color:#3572A5}
-  .lang-js{color:#f1e05a}
-  .badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;
-         padding:2px 7px;font-size:.73rem;font-weight:600;white-space:nowrap}
-  .badge-High{background:#3d1f1e;color:var(--high)}
-  .badge-Medium{background:#2d2208;color:var(--med)}
-  .badge-Low{background:#1c1f24;color:var(--low)}
-  .cat-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;
-             padding:2px 6px;font-size:.7rem;font-weight:600;white-space:nowrap}
-  .pagination{display:flex;gap:.5rem;align-items:center;justify-content:center;
-              padding:1rem;color:var(--muted);font-size:.82rem}
-  .pagination button{background:var(--surface);border:1px solid var(--border);
-                     color:var(--text);border-radius:6px;padding:.3rem .75rem;
-                     cursor:pointer;font-size:.8rem}
-  .pagination button:disabled{opacity:.35;cursor:default}
-  .pagination button:not(:disabled):hover{border-color:var(--accent);color:var(--accent)}
-  footer{text-align:center;padding:1rem;color:var(--muted);font-size:.75rem;
-         border-top:1px solid var(--border)}
+:root{
+  --bg:#0c0c0f;--surface:#13131a;--border:#1e1e2e;
+  --text:#e8e8f0;--muted:#6666880;
+  --pink:#ff6eb4;--teal:#00a896;
+  --high:#ff6eb4;--med:#ffd700;--low:#555570;
+}
+*{box-sizing:border-box;margin:0;padding:0;border-radius:0!important}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'VT323',monospace;
+  font-size:19px;
+  line-height:1.45;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+a{color:var(--pink);text-decoration:none}
+a:hover{color:var(--teal);text-decoration:underline}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes px-load{from{width:0}to{width:100%}}
+@keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+
+/* ── loading screen ── */
+#loading-screen{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;
+}
+.px-load-title{
+  font-family:'Press Start 2P',monospace;font-size:clamp(8px,2vw,13px);
+  color:var(--pink);text-shadow:0 0 12px var(--pink);letter-spacing:.1em;
+}
+.px-load-bar{
+  width:220px;height:20px;border:2px solid var(--pink);
+  background:var(--bg);position:relative;overflow:hidden;
+}
+.px-load-fill{
+  height:100%;background:var(--pink);
+  animation:px-load .9s steps(11) forwards;
+}
+.px-load-sub{
+  font-family:'VT323',monospace;font-size:16px;color:var(--teal);letter-spacing:.05em;
+}
+
+/* ── CRT scanline (subtle, fixed) ── */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0,0,0,.08) 2px,
+    rgba(0,0,0,.08) 4px
+  );
+}
+
+/* ── floating Win95 error dialogs ── */
+.win95-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.err-dlg{
+  position:absolute;width:190px;
+  background:#c0c0c0;border:2px solid;
+  border-color:#fff #808080 #808080 #fff;
+  opacity:.045;font-size:11px;color:#000;
+  font-family:'Segoe UI',Arial,sans-serif;
+}
+.err-bar{
+  background:#000080;color:#fff;
+  padding:2px 4px;display:flex;justify-content:space-between;
+  font-weight:bold;font-size:11px;align-items:center;
+}
+.err-xbtn{
+  width:16px;height:14px;background:#c0c0c0;
+  border:2px solid;border-color:#fff #808080 #808080 #fff;
+  font-size:9px;display:inline-flex;align-items:center;justify-content:center;
+}
+.err-body{padding:10px;display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+.err-ico{font-size:22px}
+.err-btns{padding:0 8px 8px;display:flex;justify-content:center;gap:6px}
+.err-btn{
+  min-width:58px;background:#c0c0c0;
+  border:2px solid;border-color:#fff #808080 #808080 #fff;
+  font-size:11px;font-family:'Segoe UI',Arial,sans-serif;padding:3px 6px;
+}
+
+/* ── page wrapper ── */
+.page-wrap{position:relative;z-index:1}
+
+/* ── header ── */
+header{
+  border-bottom:2px solid var(--teal);
+  padding:1.75rem 1.5rem 1.25rem;
+  position:relative;
+}
+.win-bar{
+  display:flex;align-items:center;gap:.6rem;
+  background:var(--teal);padding:.3rem .75rem;
+  margin-bottom:1rem;
+  box-shadow:4px 4px 0 var(--pink);
+}
+.win-bar-title{
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  color:var(--bg);flex:1;text-align:center;letter-spacing:.06em;
+}
+.win-dots{display:flex;gap:5px}
+.win-dot{
+  width:11px;height:11px;background:var(--bg);
+  border:1px solid rgba(0,0,0,.3);display:inline-block;
+}
+.win-dot.close{background:var(--pink)}
+
+header h1{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(9px,2.5vw,20px);
+  color:var(--pink);
+  text-shadow:3px 3px 0 rgba(0,168,150,.35);
+  line-height:1.5;margin-bottom:.5rem;
+}
+.year-tag{
+  font-family:'VT323',monospace;font-size:17px;
+  color:var(--teal);margin-bottom:.25rem;
+}
+header p.sub{color:var(--muted,#666688);font-size:17px}
+
+/* ── agent button ── */
+.agent-link{
+  display:inline-block;margin-top:.9rem;
+  background:transparent;color:var(--pink);
+  border:2px solid var(--pink);
+  padding:.4rem 1rem;
+  font-family:'Press Start 2P',monospace;font-size:8px;
+  text-decoration:none;
+  box-shadow:3px 3px 0 var(--teal);
+  transition:box-shadow .08s,transform .08s,color .08s,border-color .08s;
+}
+.agent-link:hover{
+  box-shadow:1px 1px 0 var(--teal);
+  transform:translate(2px,2px);
+  color:var(--teal);border-color:var(--teal);
+  text-decoration:none;
+}
+.agent-link:active{box-shadow:none;transform:translate(3px,3px)}
+.cursor{animation:blink 1s step-start infinite}
+
+/* ── stats ── */
+.stats{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.stat{
+  background:var(--surface);border:1px solid var(--border);
+  border-bottom:2px solid var(--teal);
+  padding:.25rem .7rem;font-size:17px;color:var(--muted,#666688);
+}
+.stat span{
+  font-family:'Press Start 2P',monospace;font-size:9px;
+  color:var(--text);display:inline-block;margin-right:4px;
+}
+
+/* ── controls ── */
+.controls{
+  display:flex;gap:.5rem;flex-wrap:wrap;padding:.65rem 1.5rem;
+  background:var(--surface);border-bottom:2px solid var(--border);
+  align-items:center;
+}
+input,select{
+  background:var(--bg);border:2px solid var(--border);
+  color:var(--teal);padding:.3rem .55rem;
+  font-family:'VT323',monospace;font-size:19px;outline:none;
+  caret-color:var(--pink);
+}
+input{flex:1;min-width:160px}
+input:focus{border-color:var(--pink);color:var(--text)}
+input::placeholder{color:#44445a}
+select:focus{border-color:var(--teal)}
+option{background:var(--surface);color:var(--text)}
+.count{color:#44445a;font-size:16px;margin-left:auto;font-family:'VT323',monospace}
+
+/* ── table ── */
+.table-wrap{overflow-x:auto;padding:0 1.5rem 2rem}
+table{width:100%;border-collapse:collapse;margin-top:.6rem;font-size:18px}
+
+th{
+  position:sticky;top:0;background:var(--bg);
+  border-bottom:2px solid var(--teal);
+  padding:.4rem .55rem;text-align:left;
+  color:var(--teal);cursor:pointer;user-select:none;white-space:nowrap;
+  font-family:'Press Start 2P',monospace;font-size:7px;text-transform:uppercase;
+}
+th:hover{color:var(--pink)}
+th.sort-asc::after{content:" [^]";color:var(--pink)}
+th.sort-desc::after{content:" [v]";color:var(--pink)}
+
+td{
+  padding:.38rem .55rem;border-bottom:1px solid var(--border);
+  vertical-align:top;font-family:'VT323',monospace;
+}
+tr:hover td{background:rgba(255,110,180,.035)}
+.rank{color:#44445a;width:40px;font-size:15px}
+.days{color:var(--teal);width:52px;font-weight:600}
+.desc{color:#888899;max-width:310px;font-size:17px}
+.lang-py{color:#4ec9b0}
+.lang-js{color:#ffd700}
+
+/* ── badges ── */
+.badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:1px 5px;font-family:'Press Start 2P',monospace;font-size:6px;
+  font-weight:600;white-space:nowrap;border:1px solid currentColor;
+}
+.badge-High{background:rgba(255,110,180,.12);color:var(--high)}
+.badge-Medium{background:rgba(255,215,0,.1);color:var(--med)}
+.badge-Low{background:rgba(80,80,100,.15);color:var(--low)}
+
+.cat-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:1px 5px;font-family:'VT323',monospace;font-size:15px;
+  font-weight:600;white-space:nowrap;
+  /* color/bg via inline style */
+}
+
+/* ── pagination ── */
+.pagination{
+  display:flex;gap:.45rem;align-items:center;justify-content:center;
+  padding:.85rem;border-top:1px solid var(--border);
+  font-family:'VT323',monospace;font-size:19px;color:#44445a;
+}
+.pagination button{
+  background:var(--surface);border:2px solid var(--border);
+  color:var(--text);padding:.2rem .55rem;cursor:pointer;
+  font-family:'VT323',monospace;font-size:19px;
+  box-shadow:2px 2px 0 var(--teal);
+  transition:box-shadow .07s,transform .07s,border-color .07s,color .07s;
+}
+.pagination button:disabled{opacity:.25;cursor:default;box-shadow:none}
+.pagination button:not(:disabled):hover{
+  border-color:var(--pink);color:var(--pink);box-shadow:2px 2px 0 var(--pink);
+}
+.pagination button:not(:disabled):active{box-shadow:none;transform:translate(2px,2px)}
+
+/* ── empty state ── */
+.empty-win{
+  width:300px;margin:2.5rem auto;background:#c0c0c0;
+  border:3px solid;border-color:#fff #808080 #808080 #fff;
+  font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#000;
+}
+.ew-bar{
+  background:#000080;color:#fff;padding:3px 6px;
+  display:flex;justify-content:space-between;align-items:center;
+  font-weight:bold;font-size:12px;
+}
+.ew-xbtn{
+  width:16px;height:14px;background:#c0c0c0;
+  border:2px solid;border-color:#fff #808080 #808080 #fff;
+  font-size:9px;display:inline-flex;align-items:center;justify-content:center;
+}
+.ew-body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+.ew-ico{font-size:30px}
+.ew-btn{
+  min-width:70px;background:#c0c0c0;
+  border:2px solid;border-color:#fff #808080 #808080 #fff;
+  font-family:'Segoe UI',Arial,sans-serif;font-size:12px;padding:4px 8px;cursor:pointer;
+}
+.ew-btn:active{border-color:#808080 #fff #fff #808080}
+
+/* ── footer ── */
+footer{
+  text-align:center;padding:.65rem;
+  color:#44445a;font-size:15px;
+  border-top:2px solid var(--border);background:var(--surface);
+  font-family:'VT323',monospace;
+}
 </style>
 </head>
 <body>
+
+<!-- pixel art loading screen -->
+<div id="loading-screen">
+  <div class="px-load-title">LOADING...</div>
+  <div class="px-load-bar"><div class="px-load-fill"></div></div>
+  <div class="px-load-sub">chaoticravena/repos · __YEAR_RANGE__</div>
+</div>
+
+<!-- decorative Win95 error dialogs -->
+<div class="win95-bg" aria-hidden="true">
+  <div class="err-dlg" style="top:7%;left:4%;transform:rotate(-4deg)">
+    <div class="err-bar"><span>ERROR</span><span class="err-xbtn">✕</span></div>
+    <div class="err-body"><span class="err-ico">⚠</span><span>404: Too many repos.<br>Abort, Retry, Fail?</span></div>
+    <div class="err-btns"><button class="err-btn">Abort</button><button class="err-btn">Retry</button></div>
+  </div>
+  <div class="err-dlg" style="top:12%;right:5%;transform:rotate(3deg)">
+    <div class="err-bar"><span>CRITICAL ERROR</span><span class="err-xbtn">✕</span></div>
+    <div class="err-body"><span class="err-ico">\U0001f6d1</span><span>Stack overflow at<br>0x0000deadbeef</span></div>
+    <div class="err-btns"><button class="err-btn">OK</button></div>
+  </div>
+  <div class="err-dlg" style="top:52%;left:1.5%;transform:rotate(-2.5deg)">
+    <div class="err-bar"><span>WARNING</span><span class="err-xbtn">✕</span></div>
+    <div class="err-body"><span class="err-ico">⚠</span><span>Infinite loop<br>detected in repos</span></div>
+    <div class="err-btns"><button class="err-btn">Ignore</button></div>
+  </div>
+  <div class="err-dlg" style="bottom:8%;right:3%;transform:rotate(5deg)">
+    <div class="err-bar"><span>FATAL</span><span class="err-xbtn">✕</span></div>
+    <div class="err-body"><span class="err-ico">\U0001f480</span><span>System halted.<br>Star a repo to continue.</span></div>
+    <div class="err-btns"><button class="err-btn">OK</button></div>
+  </div>
+</div>
+
+<div class="page-wrap">
 <header>
-  <h1>__TITLE__</h1>
-  <p>__SUBTITLE__</p>
+  <div class="win-bar">
+    <div class="win-dots">
+      <span class="win-dot close"></span>
+      <span class="win-dot"></span>
+      <span class="win-dot"></span>
+    </div>
+    <span class="win-bar-title">chaoticravena/repos — browser.exe</span>
+  </div>
+  <h1>chaoticravena/repos</h1>
+  <p class="year-tag">__TITLE__</p>
+  <p class="sub">__SUBTITLE__</p>
+  <a href="agent.html" class="agent-link">&gt;_ AGENTE AI<span class="cursor">_</span></a>
   <div class="stats" id="stats"></div>
 </header>
+
 <div class="controls">
-  <input type="search" id="q" placeholder="Search repo name or description…"/>
+  <input type="search" id="q" placeholder="C:\\repos&gt; search_"/>
   <select id="lang">
-    <option value="">All languages</option>
+    <option value="">[ all langs ]</option>
     <option value="Python">Python</option>
     <option value="Javascript">JavaScript</option>
   </select>
   <select id="rating">
-    <option value="">All ratings</option>
+    <option value="">[ all ratings ]</option>
     <option value="High">\U0001f525 High</option>
-    <option value="Medium">⚡ Medium</option>
+    <option value="Medium">&#x26a1; Medium</option>
     <option value="Low">\U0001f4a4 Low</option>
   </select>
   <select id="cat">
-    <option value="">All categories</option>
+    <option value="">[ all categories ]</option>
     <option value="Agentic AI">\U0001f916 Agentic AI</option>
     <option value="LLMs &amp; Models">\U0001f9e0 LLMs &amp; Models</option>
     <option value="Image &amp; Video">\U0001f3a8 Image &amp; Video</option>
-    <option value="Audio &amp; Voice">\U0001f399️ Audio &amp; Voice</option>
+    <option value="Audio &amp; Voice">\U0001f399&#xfe0f; Audio &amp; Voice</option>
     <option value="Data &amp; Analytics">\U0001f4ca Data &amp; Analytics</option>
     <option value="Web &amp; APIs">\U0001f310 Web &amp; APIs</option>
     <option value="DevTools">\U0001f527 DevTools</option>
@@ -223,11 +485,12 @@ HTML_TEMPLATE = """\
     <option value="Learning">\U0001f4da Learning</option>
     <option value="Games &amp; Creative">\U0001f3ae Games &amp; Creative</option>
     <option value="Self-hosted">\U0001f3e0 Self-hosted</option>
-    <option value="Automation &amp; Bots">\U0001f916 Automation &amp; Bots</option>
+    <option value="Automation &amp; Bots">&#x2699;&#xfe0f; Automation &amp; Bots</option>
     <option value="Other">\U0001f500 Other</option>
   </select>
   <span class="count" id="count"></span>
 </div>
+
 <div class="table-wrap">
 <table id="tbl">
   <thead>
@@ -245,10 +508,12 @@ HTML_TEMPLATE = """\
 </table>
 </div>
 <div class="pagination" id="pager"></div>
-<footer>Data sourced from <a href="https://github.com/trending" target="_blank">github.com/trending</a> · __YEAR_RANGE__</footer>
+<footer>data :: <a href="https://github.com/trending" target="_blank">github.com/trending</a> · __YEAR_RANGE__ · chaoticravena/github-trending-site</footer>
+</div>
+
 <script>
 const REPOS = __DATA__;
-const RATING_EMOJI = {High:"\U0001f525",Medium:"⚡",Low:"\U0001f4a4"};
+const RATING_EMOJI = {High:"\U0001f525",Medium:"&#x26a1;",Low:"\U0001f4a4"};
 const CATS = {
   "Agentic AI":        {e:"\U0001f916", c:"#a78bfa", bg:"#1e1040"},
   "LLMs & Models":     {e:"\U0001f9e0", c:"#60a5fa", bg:"#0d1e3d"},
@@ -261,7 +526,7 @@ const CATS = {
   "Learning":          {e:"\U0001f4da", c:"#a3e635", bg:"#162000"},
   "Games & Creative":  {e:"\U0001f3ae", c:"#818cf8", bg:"#141429"},
   "Self-hosted":       {e:"\U0001f3e0", c:"#4ade80", bg:"#0a2010"},
-  "Automation & Bots": {e:"⚙️",  c:"#fbbf24", bg:"#2a1800"},
+  "Automation & Bots": {e:"⚙️", c:"#fbbf24", bg:"#2a1800"},
   "Other":             {e:"\U0001f500", c:"#6b7280", bg:"#1a1e27"},
 };
 const PAGE_SIZE = 50;
@@ -278,7 +543,7 @@ let filtered=[...REPOS],sortCol="rank",sortDir=1,page=1;
     `<div class="stat"><span>${py.toLocaleString()}</span> Python</div>`,
     `<div class="stat"><span>${js.toLocaleString()}</span> JavaScript</div>`,
     `<div class="stat"><span style="color:var(--high)">${high.toLocaleString()}</span> \U0001f525 High</div>`,
-    `<div class="stat"><span style="color:var(--med)">${med.toLocaleString()}</span> ⚡ Medium</div>`,
+    `<div class="stat"><span style="color:var(--med)">${med.toLocaleString()}</span> &#x26a1; Med</div>`,
     `<div class="stat"><span style="color:var(--low)">${low.toLocaleString()}</span> \U0001f4a4 Low</div>`,
   ].join("");
 })();
@@ -309,6 +574,21 @@ function render(){
   const start=(page-1)*PAGE_SIZE,
         end=Math.min(page*PAGE_SIZE,filtered.length),
         rows=filtered.slice(start,end);
+  const old=document.getElementById("empty-state");
+  if(old)old.remove();
+  if(!rows.length){
+    document.getElementById("tbody").innerHTML="";
+    const el=document.createElement("div");
+    el.id="empty-state";el.className="empty-win";
+    el.innerHTML=`<div class="ew-bar"><span>ERROR — 0 results</span><span class="ew-xbtn">✕</span></div>`+
+      `<div class="ew-body"><div class="ew-ico">⚠</div>`+
+      `<div>No repos match this filter.<br>Try a different query.</div>`+
+      `<button class="ew-btn" onclick="document.getElementById('q').value='';`+
+      `document.querySelectorAll('select').forEach(s=>s.value='');applyFilters()">Clear filters</button></div>`;
+    document.querySelector(".table-wrap").appendChild(el);
+    document.getElementById("count").textContent="0 repos";
+    renderPager();return;
+  }
   document.getElementById("tbody").innerHTML=rows.map(r=>`
     <tr>
       <td class="rank">${r.rank}</td>
@@ -320,17 +600,17 @@ function render(){
       <td><span class="badge badge-${r.rating}">${RATING_EMOJI[r.rating]} ${r.rating}</span></td>
     </tr>`).join("");
   document.getElementById("count").textContent=
-    `${filtered.length.toLocaleString()} repos · page ${page}/${Math.ceil(filtered.length/PAGE_SIZE)||1}`;
+    `${filtered.length.toLocaleString()} repos · pg ${page}/${Math.ceil(filtered.length/PAGE_SIZE)||1}`;
   renderPager();
 }
 function renderPager(){
   const total=Math.ceil(filtered.length/PAGE_SIZE)||1,p=document.getElementById("pager");
   p.innerHTML=`
-    <button onclick="goPage(1)" ${page<=1?"disabled":""}>«</button>
-    <button onclick="goPage(${page-1})" ${page<=1?"disabled":""}>‹</button>
-    <span>Page ${page} / ${total}</span>
-    <button onclick="goPage(${page+1})" ${page>=total?"disabled":""}>›</button>
-    <button onclick="goPage(${total})" ${page>=total?"disabled":""}>»</button>`;
+    <button onclick="goPage(1)" ${page<=1?"disabled":""}>[|&lt;]</button>
+    <button onclick="goPage(${page-1})" ${page<=1?"disabled":""}>[&lt;&lt;]</button>
+    <span>[ ${page} / ${total} ]</span>
+    <button onclick="goPage(${page+1})" ${page>=total?"disabled":""}>[&gt;&gt;]</button>
+    <button onclick="goPage(${total})" ${page>=total?"disabled":""}>[&gt;|]</button>`;
 }
 function goPage(n){page=n;render();window.scrollTo(0,0);}
 document.querySelectorAll("th[data-col]").forEach(th=>{
@@ -345,6 +625,9 @@ document.querySelectorAll("th[data-col]").forEach(th=>{
 ["q","lang","rating","cat"].forEach(id=>
   document.getElementById(id).addEventListener("input",applyFilters));
 applyFilters();
+// remove loading screen after first render
+const _ls=document.getElementById("loading-screen");
+if(_ls)_ls.style.display="none";
 </script>
 </body>
 </html>
