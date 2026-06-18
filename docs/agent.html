@@ -6,6 +6,17 @@
     <title>chaoticravena/repos ✦ agente</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+        .stream-cursor {
+            display: inline-block;
+            width: 7px; height: 14px;
+            background: #3b82f6;
+            vertical-align: middle;
+            margin-left: 1px;
+            animation: blink .8s step-start infinite;
+        }
+    </style>
     <script type="module">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
 
@@ -19,6 +30,8 @@
         const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
         const MAX_LOCAL  = 15;
         const MAX_HIST   = 5;
+
+        const STREAMING_PROVIDERS = new Set(['anthropic', 'openrouter']);
 
         // ── state ─────────────────────────────────────────────────────────────
         let extractor, reposData = [], isReady = false;
@@ -265,6 +278,62 @@
             return data.choices?.[0]?.message?.content ?? '';
         }
 
+        // ── streaming ─────────────────────────────────────────────────────────
+        async function streamSSE(res, onEvent) {
+            const reader = res.body.getReader();
+            const dec = new TextDecoder();
+            let buf = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const d = line.slice(6).trim();
+                    if (d === '[DONE]') continue;
+                    try { onEvent(JSON.parse(d)); } catch {}
+                }
+            }
+        }
+
+        async function callLLMStream(provider, apiKey, system, userContent, onToken) {
+            const cfg = PROVIDERS[provider];
+            const headers = { 'Content-Type': 'application/json' };
+            let fullText = '';
+            const emit = t => { fullText += t; onToken(t); };
+
+            if (provider === 'anthropic') {
+                Object.assign(headers, {
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-dangerous-direct-browser-access': 'true'
+                });
+                const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({
+                    model: cfg.model, max_tokens: 2000, stream: true, system,
+                    messages: [{ role: 'user', content: userContent }]
+                })});
+                await streamSSE(res, ev => {
+                    if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta')
+                        emit(ev.delta.text);
+                });
+                return fullText;
+            }
+
+            // openrouter — openai-compatible streaming
+            headers['Authorization'] = `Bearer ${apiKey}`;
+            const res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify({
+                model: cfg.model, stream: true,
+                messages: [{ role: 'system', content: system }, { role: 'user', content: userContent }]
+            })});
+            await streamSSE(res, ev => {
+                const t = ev.choices?.[0]?.delta?.content;
+                if (t) emit(t);
+            });
+            return fullText;
+        }
+
         // ── agent ─────────────────────────────────────────────────────────────
         async function runAgent(query) {
             const provider = ui.provider.value;
@@ -276,7 +345,7 @@
             addHistory(query);
 
             try {
-                // step 1
+                // step 1 — local similarity
                 ui.overlayTxt.innerText = 'buscando similaridade...';
                 setStatus('🔍 buscando similaridade...', 'text-blue-500');
 
@@ -289,7 +358,7 @@
                     .sort((a, b) => b.sim - a.sim)
                     .slice(0, MAX_LOCAL);
 
-                // step 2
+                // step 2 — LLM
                 ui.overlayTxt.innerText = 'consultando IA...';
                 setStatus('🤖 consultando IA...', 'text-purple-500');
 
@@ -310,13 +379,50 @@ Retorne APENAS um array JSON válido com até 6 objetos no formato:
 
                 const userContent = `Usuário quer: "${query}"\n\nRepositórios locais mais similares (${localResults.length}):\n${JSON.stringify(context, null, 2)}`;
 
-                const raw   = await callLLM(provider, apiKey, system, userContent);
+                let raw;
+
+                if (STREAMING_PROVIDERS.has(provider)) {
+                    // hide spinner — we'll show the live stream instead
+                    ui.overlay.classList.add('hidden');
+
+                    // terminal-style streaming box
+                    ui.results.innerHTML = `
+                        <div id="stream-box" class="rounded-xl overflow-hidden shadow-sm border border-gray-200 mb-3">
+                            <div class="bg-gray-800 px-4 py-2.5 flex items-center justify-between">
+                                <div class="flex gap-1.5">
+                                    <span class="w-3 h-3 rounded-full bg-red-400"></span>
+                                    <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                                    <span class="w-3 h-3 rounded-full bg-green-400"></span>
+                                </div>
+                                <span class="text-xs text-gray-400 font-mono">resposta da IA</span>
+                                <span class="text-xs text-green-400 font-mono flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block"></span>live
+                                </span>
+                            </div>
+                            <div id="stream-text"
+                                 class="bg-gray-900 p-4 font-mono text-sm text-gray-300 whitespace-pre-wrap leading-relaxed min-h-[80px] max-h-[280px] overflow-y-auto">
+                            </div>
+                        </div>`;
+
+                    const streamEl = document.getElementById('stream-text');
+                    const cursor = document.createElement('span');
+                    cursor.className = 'stream-cursor';
+                    streamEl.appendChild(cursor);
+
+                    raw = await callLLMStream(provider, apiKey, system, userContent, text => {
+                        cursor.insertAdjacentText('beforebegin', text);
+                        streamEl.scrollTop = streamEl.scrollHeight;
+                    });
+
+                    document.getElementById('stream-box')?.remove();
+                } else {
+                    raw = await callLLM(provider, apiKey, system, userContent);
+                }
+
+                // step 3 — parse and render
                 const match = raw.match(/\[[\s\S]*\]/);
-                const repos = match ? JSON.parse(match[0]) : [];
-
+                const repos  = match ? JSON.parse(match[0]) : [];
                 renderResults(repos);
-
-                // step 3
                 setStatus('✦ pronto', 'text-green-600');
             } catch (err) {
                 setStatus('Erro: ' + err.message, 'text-red-600');

@@ -418,7 +418,35 @@ let filtered=[...REPOS],sortCol="rank",sortDir=1,page=1;
     `<div class="stat"><span style="color:var(--low)">${low.toLocaleString()}</span> 💤 Low</div>`,
   ].join("");
 })();
-function applyFilters(){
+
+// ── URL state ─────────────────────────────────────────────────────────────────
+function _urlParams(){
+  const p=new URLSearchParams(location.search);
+  return{q:p.get('q')||'',lang:p.get('lang')||'',pot:p.get('pot')||'',cat:p.get('cat')||'',pg:parseInt(p.get('pg'))||1};
+}
+function applyURLState(){
+  const{q,lang,pot,cat,pg}=_urlParams();
+  document.getElementById('q').value=q;
+  document.getElementById('lang').value=lang;
+  document.getElementById('rating').value=pot;
+  document.getElementById('cat').value=cat;
+  page=pg;
+}
+function pushURL(replace){
+  const q=document.getElementById('q').value,
+        lg=document.getElementById('lang').value,
+        rt=document.getElementById('rating').value,
+        ct=document.getElementById('cat').value;
+  const p=new URLSearchParams();
+  if(q)p.set('q',q);if(lg)p.set('lang',lg);if(rt)p.set('pot',rt);if(ct)p.set('cat',ct);
+  if(page>1)p.set('pg',page);
+  const url=p.toString()?`?${p}`:location.pathname;
+  if(replace)history.replaceState({},'',url);
+  else history.pushState({},'',url);
+}
+window.addEventListener('popstate',()=>{applyURLState();applyFilters(false);});
+
+function applyFilters(resetPage=true){
   const q=document.getElementById("q").value.toLowerCase(),
         lg=document.getElementById("lang").value,
         rt=document.getElementById("rating").value,
@@ -435,7 +463,10 @@ function applyFilters(){
     if(typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();}
     return av<bv?-sortDir:av>bv?sortDir:0;
   });
-  page=1;render();
+  if(resetPage)page=1;
+  const total=Math.ceil(filtered.length/PAGE_SIZE)||1;
+  if(page>total)page=total;
+  render();
 }
 function catBadge(cat){
   const info=CATS[cat]||CATS["Other"];
@@ -455,7 +486,7 @@ function render(){
       `<div class="ew-body"><div class="ew-ico">⚠</div>`+
       `<div>No repos match this filter.<br>Try a different query.</div>`+
       `<button class="ew-btn" onclick="document.getElementById('q').value='';`+
-      `document.querySelectorAll('select').forEach(s=>s.value='');applyFilters()">Clear filters</button></div>`;
+      `document.querySelectorAll('select').forEach(s=>s.value='');applyFilters();pushURL(false)">Clear filters</button></div>`;
     document.querySelector(".table-wrap").appendChild(el);
     document.getElementById("count").textContent="0 repos";
     renderPager();return;
@@ -483,19 +514,25 @@ function renderPager(){
     <button onclick="goPage(${page+1})" ${page>=total?"disabled":""}>[&gt;&gt;]</button>
     <button onclick="goPage(${total})" ${page>=total?"disabled":""}>[&gt;|]</button>`;
 }
-function goPage(n){page=n;render();window.scrollTo(0,0);}
+function goPage(n){page=n;render();window.scrollTo(0,0);pushURL(false);}
 document.querySelectorAll("th[data-col]").forEach(th=>{
   th.addEventListener("click",()=>{
     const col=th.dataset.col;
     if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}
     document.querySelectorAll("th").forEach(t=>t.classList.remove("sort-asc","sort-desc"));
     th.classList.add(sortDir===1?"sort-asc":"sort-desc");
-    applyFilters();
+    applyFilters();pushURL(false);
   });
 });
-["q","lang","rating","cat"].forEach(id=>
-  document.getElementById(id).addEventListener("input",applyFilters));
-applyFilters();
+["lang","rating","cat"].forEach(id=>
+  document.getElementById(id).addEventListener("change",()=>{applyFilters();pushURL(false);}));
+let _st;
+document.getElementById("q").addEventListener("input",()=>{
+  clearTimeout(_st);_st=setTimeout(()=>{applyFilters();pushURL(true);},200);
+});
+// restore state from URL on load, then render
+applyURLState();
+applyFilters(false);
 // remove loading screen after first render
 const _ls=document.getElementById("loading-screen");
 if(_ls)_ls.style.display="none";
