@@ -99,6 +99,12 @@ def categorise(name: str, desc: str) -> str:
             return label
     return OTHER
 
+# strips " — for <audience>" suffix added by enrich_descriptions.py
+_SUFFIX_RE = re.compile(r'\s*—\s*for\s.+$', re.IGNORECASE)
+
+def strip_suffix(desc: str) -> str:
+    return _SUFFIX_RE.sub('', desc).strip() if desc else desc
+
 # ── parse source (.json or .md) ───────────────────────────────────────────────
 ROW_RE = re.compile(
     r'^\| (\d+) \| \[([^\]]+)\]\(([^)]+)\) \| (\w+) \| (\d+) \| (.*?) \| (.+?) \|$'
@@ -512,8 +518,8 @@ footer{
 <footer>data :: <a href="https://github.com/trending" target="_blank">github.com/trending</a> · __YEAR_RANGE__ · chaoticravena/github-trending-site</footer>
 </div>
 
+<script src="data.js"></script>
 <script>
-const REPOS = __DATA__;
 const RATING_EMOJI = {High:"\U0001f525",Medium:"&#x26a1;",Low:"\U0001f4a4"};
 const CATS = {
   "Agentic AI":        {e:"\U0001f916", c:"#a78bfa", bg:"#1e1040"},
@@ -685,9 +691,11 @@ def main():
     repos = parse_source(SRC)
     print(f"Repos    : {len(repos):,}")
 
-    # Assign / refresh category on every run
+    # Assign / refresh category and strip audience suffix on every run
     for r in repos:
         r["category"] = categorise(r["name"], r.get("desc", ""))
+        if r.get("desc"):
+            r["desc"] = strip_suffix(r["desc"])
 
     counts = Counter(r["category"] for r in repos)
     print("Categories:")
@@ -706,12 +714,19 @@ def main():
     docs_json.write_text(json_text, encoding="utf-8")
     print(f"JSON     : docs/data/repos.json  ({docs_json.stat().st_size // 1024} KB)  [Pages mirror]")
 
+    # Write docs/data.js — REPOS as external file so index.html stays small
+    data_js = ROOT / "docs" / "data.js"
+    data_js.write_text(
+        "const REPOS = " + json.dumps(repos, ensure_ascii=False) + ";\n",
+        encoding="utf-8"
+    )
+    print(f"data.js  : docs/data.js  ({data_js.stat().st_size // 1024} KB)")
+
     HTML_OUT.parent.mkdir(parents=True, exist_ok=True)
     html = (HTML_TEMPLATE
             .replace("__TITLE__",      TITLE)
             .replace("__SUBTITLE__",   SUBTITLE)
-            .replace("__YEAR_RANGE__", YEAR_RANGE)
-            .replace("__DATA__",       json.dumps(repos, ensure_ascii=False)))
+            .replace("__YEAR_RANGE__", YEAR_RANGE))
     HTML_OUT.write_text(html, encoding="utf-8")
     print(f"HTML     : {HTML_OUT.name}  ({HTML_OUT.stat().st_size // 1024} KB)")
     print("Done.")
