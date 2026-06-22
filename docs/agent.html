@@ -284,22 +284,20 @@ option{background:var(--surface)}
             b.addEventListener('click', () => removeHistory(b.dataset.q)));
     }
 
+    // ── load precomputed embeddings from build-time JSON ──────────────────
+    async function loadPrecomputed() {
+        try {
+            const r = await fetch('data/repos_embeddings.json');
+            if (!r.ok) return null;
+            const arr = await r.json();
+            const map = new Map(arr.map(e => [e.url, e.embedding]));
+            return map;
+        } catch { return null; }
+    }
+
     // ── init ──────────────────────────────────────────────────────────────
     async function init() {
         try {
-            setStatus('Carregando modelo de IA local...', 'info');
-            showProg(0);
-
-            extractor = await pipeline('feature-extraction', MODEL_NAME, {
-                progress_callback: p => {
-                    if ((p.status === 'progress' || p.status === 'download') && p.progress != null)
-                        showProg(p.progress);
-                    else if (p.status === 'done')
-                        showProg(100);
-                }
-            });
-
-            hideProg();
             setStatus('Carregando base de dados...', 'info');
 
             let response;
@@ -313,18 +311,41 @@ option{background:var(--surface)}
             const storedHash = localStorage.getItem('repos_hash');
 
             if (storedHash !== currHash) {
-                setStatus('Nova versao — recalculando indice...', 'warn');
+                setStatus('Nova versao detectada — limpando cache...', 'warn');
                 await dbClear();
                 localStorage.setItem('repos_hash', currHash);
             }
 
             reposData = JSON.parse(reposText);
 
+            // 1) IndexedDB cache (mais rápido nas próximas visitas)
             const cached    = await dbGetAll();
             const cachedMap = new Map(cached.map(c => [c.url, c.embedding]));
-            const toEmbed   = reposData.filter(r => !cachedMap.has(r.url));
+
+            // 2) Arquivo pré-computado em build-time
+            setStatus('Carregando embeddings pré-computados...', 'info');
+            const precomputed = await loadPrecomputed();
+
+            // Quais repos ainda não têm embedding de nenhuma fonte
+            const toEmbed = reposData.filter(r =>
+                !cachedMap.has(r.url) && !(precomputed && precomputed.has(r.url))
+            );
 
             if (toEmbed.length > 0) {
+                // Só carrega o modelo se realmente precisar (repos novos não cobertos)
+                setStatus(`Carregando modelo para ${toEmbed.length} repos novos...`, 'info');
+                showProg(0);
+
+                extractor = await pipeline('feature-extraction', MODEL_NAME, {
+                    progress_callback: p => {
+                        if ((p.status === 'progress' || p.status === 'download') && p.progress != null)
+                            showProg(p.progress);
+                        else if (p.status === 'done')
+                            showProg(100);
+                    }
+                });
+
+                hideProg();
                 showProg(0);
                 const batch = [];
                 for (let i = 0; i < toEmbed.length; i++) {
@@ -337,13 +358,26 @@ option{background:var(--surface)}
                     const pct = ((i + 1) / toEmbed.length) * 100;
                     if (i % 15 === 0 || i === toEmbed.length - 1) {
                         showProg(pct);
-                        setStatus(`Indexando: ${i + 1} / ${toEmbed.length}`, 'info');
+                        setStatus(`Indexando novos: ${i + 1} / ${toEmbed.length}`, 'info');
                     }
                 }
                 await dbSave(batch);
             }
 
-            reposData.forEach(r => { if (!r.embedding) r.embedding = cachedMap.get(r.url); });
+            // Aplica embeddings em ordem de prioridade: IndexedDB > pré-computado > inline
+            reposData.forEach(r => {
+                if (r.embedding) return;
+                if (cachedMap.has(r.url))         { r.embedding = cachedMap.get(r.url); return; }
+                if (precomputed?.has(r.url))       { r.embedding = precomputed.get(r.url); }
+            });
+
+            // Salva embeddings do arquivo pré-computado no IndexedDB para acesso offline futuro
+            if (precomputed && precomputed.size > 0 && cached.length < reposData.length) {
+                const missing = reposData
+                    .filter(r => r.embedding && !cachedMap.has(r.url))
+                    .map(r => ({ url: r.url, embedding: r.embedding }));
+                if (missing.length > 0) dbSave(missing).catch(() => {});
+            }
 
             isReady = true;
             hideProg();
