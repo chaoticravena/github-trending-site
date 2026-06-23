@@ -226,6 +226,13 @@ tr:hover td{background:rgba(255,110,180,.035)}
   font-weight:600;white-space:nowrap;
   /* color/bg via inline style */
 }
+.lic-badge{
+  display:inline-block;padding:1px 5px;
+  font-family:'Press Start 2P',monospace;font-size:6px;
+  color:#00a896;border:1px solid #00a89640;background:rgba(0,168,150,.08);
+  white-space:nowrap;
+}
+.lic-none{color:#44445a;font-size:15px}
 
 /* ── pagination ── */
 .pagination{
@@ -359,6 +366,23 @@ footer{
     <option value="Automation &amp; Bots">&#x2699;&#xfe0f; Automation &amp; Bots</option>
     <option value="Other">🔀 Other</option>
   </select>
+  <select id="lic">
+    <option value="">[ all licenses ]</option>
+    <option value="MIT">MIT</option>
+    <option value="Apache-2.0">Apache-2.0</option>
+    <option value="GPL-3.0">GPL-3.0</option>
+    <option value="GPL-2.0">GPL-2.0</option>
+    <option value="AGPL-3.0">AGPL-3.0</option>
+    <option value="BSD-3-Clause">BSD-3-Clause</option>
+    <option value="BSD-2-Clause">BSD-2-Clause</option>
+    <option value="MPL-2.0">MPL-2.0</option>
+    <option value="LGPL-2.1">LGPL-2.1</option>
+    <option value="ISC">ISC</option>
+    <option value="CC0-1.0">CC0-1.0</option>
+    <option value="Unlicense">Unlicense</option>
+    <option value="NOASSERTION">NOASSERTION</option>
+    <option value="__null__">No license</option>
+  </select>
   <span class="count" id="count"></span>
 </div>
 
@@ -373,6 +397,7 @@ footer{
       <th data-col="days">Days</th>
       <th data-col="desc">Description</th>
       <th data-col="rating">Potential</th>
+      <th data-col="license">License</th>
     </tr>
   </thead>
   <tbody id="tbody"></tbody>
@@ -422,23 +447,25 @@ let filtered=[...REPOS],sortCol="rank",sortDir=1,page=1;
 // ── URL state ─────────────────────────────────────────────────────────────────
 function _urlParams(){
   const p=new URLSearchParams(location.search);
-  return{q:p.get('q')||'',lang:p.get('lang')||'',pot:p.get('pot')||'',cat:p.get('cat')||'',pg:parseInt(p.get('pg'))||1};
+  return{q:p.get('q')||'',lang:p.get('lang')||'',pot:p.get('pot')||'',cat:p.get('cat')||'',lic:p.get('lic')||'',pg:parseInt(p.get('pg'))||1};
 }
 function applyURLState(){
-  const{q,lang,pot,cat,pg}=_urlParams();
+  const{q,lang,pot,cat,lic,pg}=_urlParams();
   document.getElementById('q').value=q;
   document.getElementById('lang').value=lang;
   document.getElementById('rating').value=pot;
   document.getElementById('cat').value=cat;
+  document.getElementById('lic').value=lic;
   page=pg;
 }
 function pushURL(replace){
   const q=document.getElementById('q').value,
         lg=document.getElementById('lang').value,
         rt=document.getElementById('rating').value,
-        ct=document.getElementById('cat').value;
+        ct=document.getElementById('cat').value,
+        lc=document.getElementById('lic').value;
   const p=new URLSearchParams();
-  if(q)p.set('q',q);if(lg)p.set('lang',lg);if(rt)p.set('pot',rt);if(ct)p.set('cat',ct);
+  if(q)p.set('q',q);if(lg)p.set('lang',lg);if(rt)p.set('pot',rt);if(ct)p.set('cat',ct);if(lc)p.set('lic',lc);
   if(page>1)p.set('pg',page);
   const url=p.toString()?`?${p}`:location.pathname;
   if(replace)history.replaceState({},'',url);
@@ -450,12 +477,17 @@ function applyFilters(resetPage=true){
   const q=document.getElementById("q").value.toLowerCase(),
         lg=document.getElementById("lang").value,
         rt=document.getElementById("rating").value,
-        ct=document.getElementById("cat").value;
+        ct=document.getElementById("cat").value,
+        lc=document.getElementById("lic").value;
   filtered=REPOS.filter(r=>{
     if(q&&!r.name.toLowerCase().includes(q)&&!(r.desc||"").toLowerCase().includes(q))return false;
     if(lg&&r.lang!==lg)return false;
     if(rt&&r.rating!==rt)return false;
     if(ct&&r.category!==ct)return false;
+    if(lc){
+      if(lc==='__null__'&&r.license!=null)return false;
+      if(lc!=='__null__'&&r.license!==lc)return false;
+    }
     return true;
   });
   filtered.sort((a,b)=>{
@@ -500,6 +532,7 @@ function render(){
       <td class="days">${r.days}d</td>
       <td class="desc">${r.desc||""}</td>
       <td><span class="badge badge-${r.rating}">${RATING_EMOJI[r.rating]} ${r.rating}</span></td>
+      <td>${r.license?`<span class="lic-badge">${r.license}</span>`:'<span class="lic-none">—</span>'}</td>
     </tr>`).join("");
   document.getElementById("count").textContent=
     `${filtered.length.toLocaleString()} repos · pg ${page}/${Math.ceil(filtered.length/PAGE_SIZE)||1}`;
@@ -524,7 +557,7 @@ document.querySelectorAll("th[data-col]").forEach(th=>{
     applyFilters();pushURL(false);
   });
 });
-["lang","rating","cat"].forEach(id=>
+["lang","rating","cat","lic"].forEach(id=>
   document.getElementById(id).addEventListener("change",()=>{applyFilters();pushURL(false);}));
 let _st;
 document.getElementById("q").addEventListener("input",()=>{
