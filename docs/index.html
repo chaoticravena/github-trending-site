@@ -7,7 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0c0c0f;--surface:#13131a;--border:#1e1e2e;
@@ -20,7 +20,7 @@
 body{
   background:var(--bg);
   color:var(--text);
-  font-family:'VT323',monospace;
+  font-family:'IBM Plex Mono',monospace;
   font-size:19px;
   line-height:1.45;
   min-height:100vh;
@@ -51,7 +51,7 @@ a:hover{color:var(--teal);text-decoration:underline}
   animation:px-load .9s steps(11) forwards;
 }
 .px-load-sub{
-  font-family:'VT323',monospace;font-size:16px;color:var(--teal);letter-spacing:.05em;
+  font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--teal);letter-spacing:.05em;
 }
 
 /* ── CRT scanline (subtle, fixed) ── */
@@ -128,7 +128,7 @@ header h1{
   line-height:1.5;margin-bottom:.5rem;
 }
 .year-tag{
-  font-family:'VT323',monospace;font-size:17px;
+  font-family:'IBM Plex Mono',monospace;font-size:17px;
   color:var(--teal);margin-bottom:.25rem;
 }
 header p.sub{color:var(--muted,#666688);font-size:17px}
@@ -174,7 +174,7 @@ header p.sub{color:var(--muted,#666688);font-size:17px}
 input,select{
   background:var(--bg);border:2px solid var(--border);
   color:var(--teal);padding:.3rem .55rem;
-  font-family:'VT323',monospace;font-size:19px;outline:none;
+  font-family:'IBM Plex Mono',monospace;font-size:19px;outline:none;
   caret-color:var(--pink);
 }
 input{flex:1;min-width:160px}
@@ -182,7 +182,7 @@ input:focus{border-color:var(--pink);color:var(--text)}
 input::placeholder{color:#44445a}
 select:focus{border-color:var(--teal)}
 option{background:var(--surface);color:var(--text)}
-.count{color:#44445a;font-size:16px;margin-left:auto;font-family:'VT323',monospace}
+.count{color:#44445a;font-size:16px;margin-left:auto;font-family:'IBM Plex Mono',monospace}
 
 /* ── table ── */
 .table-wrap{overflow-x:auto;padding:0 1.5rem 2rem}
@@ -201,7 +201,7 @@ th.sort-desc::after{content:" [v]";color:var(--pink)}
 
 td{
   padding:.38rem .55rem;border-bottom:1px solid var(--border);
-  vertical-align:top;font-family:'VT323',monospace;
+  vertical-align:top;font-family:'IBM Plex Mono',monospace;
 }
 tr:hover td{background:rgba(255,110,180,.035)}
 .rank{color:#44445a;width:40px;font-size:15px}
@@ -222,7 +222,7 @@ tr:hover td{background:rgba(255,110,180,.035)}
 
 .cat-badge{
   display:inline-flex;align-items:center;gap:3px;
-  padding:1px 5px;font-family:'VT323',monospace;font-size:15px;
+  padding:1px 5px;font-family:'IBM Plex Mono',monospace;font-size:15px;
   font-weight:600;white-space:nowrap;
   /* color/bg via inline style */
 }
@@ -238,12 +238,12 @@ tr:hover td{background:rgba(255,110,180,.035)}
 .pagination{
   display:flex;gap:.45rem;align-items:center;justify-content:center;
   padding:.85rem;border-top:1px solid var(--border);
-  font-family:'VT323',monospace;font-size:19px;color:#44445a;
+  font-family:'IBM Plex Mono',monospace;font-size:19px;color:#44445a;
 }
 .pagination button{
   background:var(--surface);border:2px solid var(--border);
   color:var(--text);padding:.2rem .55rem;cursor:pointer;
-  font-family:'VT323',monospace;font-size:19px;
+  font-family:'IBM Plex Mono',monospace;font-size:19px;
   box-shadow:2px 2px 0 var(--teal);
   transition:box-shadow .07s,transform .07s,border-color .07s,color .07s;
 }
@@ -283,7 +283,7 @@ footer{
   text-align:center;padding:.65rem;
   color:#44445a;font-size:15px;
   border-top:2px solid var(--border);background:var(--surface);
-  font-family:'VT323',monospace;
+  font-family:'IBM Plex Mono',monospace;
 }
 </style>
 </head>
