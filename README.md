@@ -1,6 +1,6 @@
 # GitHub Trending Site
 
-Static GitHub Pages site listing **6,242 unique Python & JavaScript repositories** sourced from daily GitHub trending snapshots (2023–2026), enriched with category, stars, last commit, archived status, license and similar-repo suggestions.
+Static GitHub Pages site listing **5,992 unique Python & JavaScript repositories** sourced from daily GitHub trending snapshots (2023–2026), enriched with category, stars, last commit, archived status, license and similar-repo suggestions.
 
 ## Live site
 
@@ -8,7 +8,7 @@ Static GitHub Pages site listing **6,242 unique Python & JavaScript repositories
 
 ## Features
 
-- **6,242 repos**, Python and JavaScript (Go/Swift excluded)
+- **5,992 repos** (3,788 Python, 2,204 JavaScript; renamed repos merged, Go/Swift excluded)
 - Category chips with counts, including **✳️ Claude Skills** (skills and plugins for Claude Code and other agents)
 - Health dot per repo (active / slowing / inactive or archived) and stars
 - Filters: language, status (not archived, commit in last 90 days, trending in last 30 days), license (incl. one-click "OK for commercial use"), potential
@@ -28,7 +28,8 @@ scripts/fetch_trending.js        → fetches last N days, filters Python/JS, mer
                                     sets days / last_seen / category
         ↓
 scripts/enrich_github.js         → stars, pushed, archived, license via GitHub GraphQL
-                                    (50 repos/query, refreshes every repo each run)
+                                    (50 repos/query, refreshes every repo each run,
+                                    follows renames and merges duplicates)
         ↓
 scripts/precompute_embeddings.js → all-MiniLM-L6-v2 embeddings (int8, for the agent)
                                     + top-5 similar repos per repo (for the detail panel)
@@ -112,9 +113,9 @@ GitHub Pages serves from `docs/` on the `master` branch.
 
 | License | Repos |
 |---|---:|
-| MIT | 2,222 |
-| Apache-2.0 | 1,328 |
-| *(no license)* | 1,065 |
-| NOASSERTION | 644 |
-| GPL-3.0 | 387 |
-| AGPL-3.0 | 253 |
+| MIT | 2,147 |
+| Apache-2.0 | 1,248 |
+| *(no license)* | 1,043 |
+| NOASSERTION | 620 |
+| GPL-3.0 | 368 |
+| AGPL-3.0 | 233 |

@@ -24,7 +24,7 @@ function getToken() {
 function buildQuery(batch) {
     return 'query {\n' + batch.map(({ alias, owner, name }) =>
         `  ${alias}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) ` +
-        '{ stargazerCount pushedAt isArchived licenseInfo { spdxId } }'
+        '{ nameWithOwner stargazerCount pushedAt isArchived licenseInfo { spdxId } }'
     ).join('\n') + '\n}';
 }
 
@@ -73,6 +73,10 @@ async function main() {
         for (const b of batch) {
             const node = data[b.alias];
             if (!node) { missing++; b.repo.archived = true; continue; }  // apagado ou privado: trata como morto
+            if (node.nameWithOwner !== b.repo.name) {   // renomeado/transferido: passa a usar o nome atual
+                b.repo.name = node.nameWithOwner;
+                b.repo.url  = `https://github.com/${node.nameWithOwner}`;
+            }
             b.repo.license  = node.licenseInfo?.spdxId ?? null;
             b.repo.stars    = node.stargazerCount;
             b.repo.pushed   = node.pushedAt ? node.pushedAt.slice(0, 10) : null;
@@ -81,6 +85,26 @@ async function main() {
         process.stdout.write(`\r[${String(Math.min(i + batchSize, repos.length)).padStart(5)}/${repos.length}]`);
         await new Promise(r => setTimeout(r, 150));
     }
+
+    // renomeações podem gerar duas entradas pro mesmo repo: junta somando days (cada nome contou dias diferentes)
+    const merged = new Map();
+    for (const r of repos) {
+        const key = r.url.toLowerCase(), prev = merged.get(key);
+        if (!prev) { merged.set(key, r); continue; }
+        const [keep, drop] = (prev.days || 0) >= (r.days || 0) ? [prev, r] : [r, prev];
+        keep.days = (keep.days || 0) + (drop.days || 0);
+        if ((drop.last_seen || '') > (keep.last_seen || '')) keep.last_seen = drop.last_seen;
+        if (!keep.desc) keep.desc = drop.desc;
+        const order = { High: 0, Medium: 1, Low: 2 };
+        if ((order[drop.rating] ?? 3) < (order[keep.rating] ?? 3)) keep.rating = drop.rating;
+        merged.set(key, keep);
+    }
+    const dupes = repos.length - merged.size;
+    repos.length = 0;
+    repos.push(...[...merged.values()].sort((a, b) =>
+        (b.days || 0) - (a.days || 0) || a.name.toLowerCase().localeCompare(b.name.toLowerCase())));
+    repos.forEach((r, i) => { r.rank = i + 1; });
+    if (dupes) console.log(`\nDuplicatas por renomeação juntadas: ${dupes}`);
 
     const jsonText = JSON.stringify(repos, null, 2);
     writeFileSync(DOCS_JSON, jsonText, 'utf8');
