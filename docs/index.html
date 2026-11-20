@@ -4,571 +4,648 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>chaoticravena/repos · GitHub Trending 2023–2026 · Python &amp; JS</title>
+<meta name="description" content="6k+ Python & JavaScript repos from GitHub Trending 2023–2026, with stars, last commit, license, category and similar-repo suggestions."/>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0c0c0f;--surface:#13131a;--border:#1e1e2e;
-  --text:#e8e8f0;--muted:#6666880;
+  --bg:#0c0c0f;--surface:#13131a;--border:#262636;
+  --text:#e8e8f0;--muted:#9a9ab4;--dim:#8a8aa8;
   --pink:#ff6eb4;--teal:#00a896;
-  --high:#ff6eb4;--med:#ffd700;--low:#555570;
+  --high:#ff6eb4;--med:#ffd700;--low:#8a8aa8;
+  --alive:#4ade80;--stale:#fbbf24;--dead:#6b6b80;
 }
 *{box-sizing:border-box;margin:0;padding:0;border-radius:0!important}
-
 body{
-  background:var(--bg);
-  color:var(--text);
-  font-family:'IBM Plex Mono',monospace;
-  font-size:19px;
-  line-height:1.45;
-  min-height:100vh;
-  overflow-x:hidden;
+  background:var(--bg);color:var(--text);
+  font-family:'IBM Plex Mono',monospace;font-size:16px;line-height:1.5;
+  min-height:100vh;overflow-x:hidden;
 }
 a{color:var(--pink);text-decoration:none}
 a:hover{color:var(--teal);text-decoration:underline}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes px-load{from{width:0}to{width:100%}}
-@keyframes scanline{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
 
-/* ── loading screen ── */
+/* ── loading ── */
 #loading-screen{
   position:fixed;inset:0;background:var(--bg);z-index:9999;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;
 }
-.px-load-title{
-  font-family:'Press Start 2P',monospace;font-size:clamp(8px,2vw,13px);
-  color:var(--pink);text-shadow:0 0 12px var(--pink);letter-spacing:.1em;
-}
-.px-load-bar{
-  width:220px;height:20px;border:2px solid var(--pink);
-  background:var(--bg);position:relative;overflow:hidden;
-}
-.px-load-fill{
-  height:100%;background:var(--pink);
-  animation:px-load .9s steps(11) forwards;
-}
-.px-load-sub{
-  font-family:'IBM Plex Mono',monospace;font-size:16px;color:var(--teal);letter-spacing:.05em;
-}
+.px-load-title{font-family:'Press Start 2P',monospace;font-size:13px;color:var(--pink);text-shadow:0 0 12px var(--pink);letter-spacing:.1em}
+.px-load-bar{width:220px;height:20px;border:2px solid var(--pink);overflow:hidden}
+.px-load-fill{height:100%;background:var(--pink);animation:px-load .9s steps(11) forwards}
+.px-load-sub{font-size:14px;color:var(--teal)}
 
-/* ── CRT scanline (subtle, fixed) ── */
+/* ── CRT scanlines ── */
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:9998;
-  background:repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 2px,
-    rgba(0,0,0,.08) 2px,
-    rgba(0,0,0,.08) 4px
-  );
+  background:repeating-linear-gradient(to bottom,transparent 0,transparent 2px,rgba(0,0,0,.08) 2px,rgba(0,0,0,.08) 4px);
 }
 
-/* ── floating Win95 error dialogs ── */
-.win95-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+/* ── Win95 decor (header only) ── */
+header{position:relative;overflow:hidden;border-bottom:2px solid var(--teal);padding:1.5rem 1.5rem 1.1rem}
+.win95-bg{position:absolute;inset:0;pointer-events:none;z-index:0}
 .err-dlg{
-  position:absolute;width:190px;
-  background:#c0c0c0;border:2px solid;
-  border-color:#fff #808080 #808080 #fff;
-  opacity:.045;font-size:11px;color:#000;
-  font-family:'Segoe UI',Arial,sans-serif;
+  position:absolute;width:190px;background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff;
+  opacity:.06;font-size:11px;color:#000;font-family:'Segoe UI',Arial,sans-serif;
 }
-.err-bar{
-  background:#000080;color:#fff;
-  padding:2px 4px;display:flex;justify-content:space-between;
-  font-weight:bold;font-size:11px;align-items:center;
-}
-.err-xbtn{
-  width:16px;height:14px;background:#c0c0c0;
-  border:2px solid;border-color:#fff #808080 #808080 #fff;
-  font-size:9px;display:inline-flex;align-items:center;justify-content:center;
-}
-.err-body{padding:10px;display:flex;gap:8px;align-items:flex-start;line-height:1.4}
-.err-ico{font-size:22px}
-.err-btns{padding:0 8px 8px;display:flex;justify-content:center;gap:6px}
-.err-btn{
-  min-width:58px;background:#c0c0c0;
-  border:2px solid;border-color:#fff #808080 #808080 #fff;
-  font-size:11px;font-family:'Segoe UI',Arial,sans-serif;padding:3px 6px;
-}
+.err-bar{background:#000080;color:#fff;padding:2px 4px;font-weight:bold}
+.err-body{padding:10px;line-height:1.4}
+header>*:not(.win95-bg){position:relative;z-index:1}
 
-/* ── page wrapper ── */
-.page-wrap{position:relative;z-index:1}
-
-/* ── header ── */
-header{
-  border-bottom:2px solid var(--teal);
-  padding:1.75rem 1.5rem 1.25rem;
-  position:relative;
-}
 .win-bar{
-  display:flex;align-items:center;gap:.6rem;
-  background:var(--teal);padding:.3rem .75rem;
-  margin-bottom:1rem;
-  box-shadow:4px 4px 0 var(--pink);
+  display:flex;align-items:center;gap:.6rem;background:var(--teal);padding:.3rem .75rem;
+  margin-bottom:1rem;box-shadow:4px 4px 0 var(--pink);
 }
-.win-bar-title{
-  font-family:'Press Start 2P',monospace;font-size:8px;
-  color:var(--bg);flex:1;text-align:center;letter-spacing:.06em;
-}
+.win-bar-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--bg);flex:1;text-align:center;letter-spacing:.06em}
 .win-dots{display:flex;gap:5px}
-.win-dot{
-  width:11px;height:11px;background:var(--bg);
-  border:1px solid rgba(0,0,0,.3);display:inline-block;
-}
+.win-dot{width:11px;height:11px;background:var(--bg);display:inline-block}
 .win-dot.close{background:var(--pink)}
-
 header h1{
-  font-family:'Press Start 2P',monospace;
-  font-size:clamp(9px,2.5vw,20px);
-  color:var(--pink);
-  text-shadow:3px 3px 0 rgba(0,168,150,.35);
-  line-height:1.5;margin-bottom:.5rem;
+  font-family:'Press Start 2P',monospace;font-size:clamp(12px,2.5vw,20px);
+  color:var(--pink);text-shadow:3px 3px 0 rgba(0,168,150,.35);line-height:1.5;margin-bottom:.4rem;
 }
-.year-tag{
-  font-family:'IBM Plex Mono',monospace;font-size:17px;
-  color:var(--teal);margin-bottom:.25rem;
-}
-header p.sub{color:var(--muted,#666688);font-size:17px}
-
-/* ── agent button ── */
-.agent-link{
-  display:inline-block;margin-top:.9rem;
-  background:transparent;color:var(--pink);
-  border:2px solid var(--pink);
-  padding:.4rem 1rem;
-  font-family:'Press Start 2P',monospace;font-size:8px;
-  text-decoration:none;
-  box-shadow:3px 3px 0 var(--teal);
+.sub{color:var(--muted);font-size:15px}
+.stats-line{color:var(--muted);font-size:14px;margin-top:.35rem}
+.stats-line b{color:var(--text);font-weight:600}
+.header-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.9rem}
+.px-btn{
+  display:inline-flex;align-items:center;gap:.4rem;background:var(--bg);color:var(--pink);
+  border:2px solid var(--pink);padding:.4rem .9rem;font-size:13px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.04em;box-shadow:3px 3px 0 var(--teal);
   transition:box-shadow .08s,transform .08s,color .08s,border-color .08s;
 }
-.agent-link:hover{
-  box-shadow:1px 1px 0 var(--teal);
-  transform:translate(2px,2px);
-  color:var(--teal);border-color:var(--teal);
-  text-decoration:none;
-}
-.agent-link:active{box-shadow:none;transform:translate(3px,3px)}
+.px-btn:hover{box-shadow:1px 1px 0 var(--teal);transform:translate(2px,2px);color:var(--teal);border-color:var(--teal);text-decoration:none}
+.px-btn.on{background:var(--pink);color:var(--bg)}
+.px-btn.ghost{color:var(--teal);border-color:var(--teal);box-shadow:3px 3px 0 var(--pink)}
 .cursor{animation:blink 1s step-start infinite}
 
-/* ── stats ── */
-.stats{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
-.stat{
-  background:var(--surface);border:1px solid var(--border);
-  border-bottom:2px solid var(--teal);
-  padding:.25rem .7rem;font-size:17px;color:var(--muted,#666688);
-}
-.stat span{
-  font-family:'Press Start 2P',monospace;font-size:9px;
-  color:var(--text);display:inline-block;margin-right:4px;
-}
-
-/* ── controls ── */
-.controls{
-  display:flex;gap:.5rem;flex-wrap:wrap;padding:.65rem 1.5rem;
-  background:var(--surface);border-bottom:2px solid var(--border);
-  align-items:center;
-}
+/* ── sticky controls ── */
+.controls{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:2px solid var(--border)}
+.ctrl-row{display:flex;gap:.5rem;flex-wrap:wrap;padding:.6rem 1.5rem .4rem;align-items:center}
 input,select{
-  background:var(--bg);border:2px solid var(--border);
-  color:var(--teal);padding:.3rem .55rem;
-  font-family:'IBM Plex Mono',monospace;font-size:19px;outline:none;
-  caret-color:var(--pink);
+  background:var(--bg);border:2px solid var(--border);color:var(--teal);
+  padding:.3rem .5rem;font-family:inherit;font-size:15px;outline:none;caret-color:var(--pink);
 }
-input{flex:1;min-width:160px}
-input:focus{border-color:var(--pink);color:var(--text)}
-input::placeholder{color:#44445a}
-select:focus{border-color:var(--teal)}
+#q{flex:1 1 220px;min-width:0}
+input:focus,select:focus{border-color:var(--pink);color:var(--text)}
+input::placeholder{color:var(--dim)}
 option{background:var(--surface);color:var(--text)}
-.count{color:#44445a;font-size:16px;margin-left:auto;font-family:'IBM Plex Mono',monospace}
+.chips{display:flex;gap:.35rem;overflow-x:auto;padding:.1rem 1.5rem .55rem;scrollbar-width:thin}
+.chip{
+  flex:none;background:var(--bg);border:1px solid var(--border);color:var(--muted);
+  padding:.15rem .55rem;font-size:13px;white-space:nowrap;
+}
+.chip:hover{border-color:var(--teal);color:var(--text)}
+.chip.on{border-color:currentColor;color:var(--c,var(--pink));background:var(--bgc,#2a0e1e)}
+.chip .n{opacity:.7;margin-left:.25rem}
+.active-row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;padding:0 1.5rem .5rem;font-size:13px}
+.active-row:empty{display:none}
+.tag{background:var(--bg);border:1px solid var(--pink);color:var(--pink);padding:0 .45rem;font-size:13px}
+.tag:hover{background:var(--pink);color:var(--bg)}
+.clear-all{background:none;border:0;color:var(--teal);font-size:13px;text-decoration:underline}
+.count{color:var(--muted);font-size:13px;margin-left:auto;white-space:nowrap}
 
 /* ── table ── */
-.table-wrap{overflow-x:auto;padding:0 1.5rem 2rem}
-table{width:100%;border-collapse:collapse;margin-top:.6rem;font-size:18px}
-
+.table-wrap{padding:0 1.5rem 1.5rem;background:var(--bg)}
+table{width:100%;border-collapse:collapse;margin-top:.5rem;font-size:15px}
 th{
-  position:sticky;top:0;background:var(--bg);
-  border-bottom:2px solid var(--teal);
-  padding:.4rem .55rem;text-align:left;
-  color:var(--teal);cursor:pointer;user-select:none;white-space:nowrap;
-  font-family:'Press Start 2P',monospace;font-size:7px;text-transform:uppercase;
+  border-bottom:2px solid var(--teal);padding:.45rem .5rem;text-align:left;color:var(--teal);
+  white-space:nowrap;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
 }
-th:hover{color:var(--pink)}
-th.sort-asc::after{content:" [^]";color:var(--pink)}
-th.sort-desc::after{content:" [v]";color:var(--pink)}
-
-td{
-  padding:.38rem .55rem;border-bottom:1px solid var(--border);
-  vertical-align:top;font-family:'IBM Plex Mono',monospace;
-}
-tr:hover td{background:rgba(255,110,180,.035)}
-.rank{color:#44445a;width:40px;font-size:15px}
-.days{color:var(--teal);width:52px;font-weight:600}
-.desc{color:#888899;max-width:310px;font-size:17px}
-.lang-py{color:#4ec9b0}
-.lang-js{color:#ffd700}
+th[data-col]{cursor:pointer;user-select:none}
+th[data-col]:hover{color:var(--pink)}
+th.sort-asc::after{content:" ▲";color:var(--pink)}
+th.sort-desc::after{content:" ▼";color:var(--pink)}
+td{padding:.45rem .5rem;border-bottom:1px solid var(--border);vertical-align:top}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:rgba(255,110,180,.05)}
+tbody tr.sel td{background:rgba(0,168,150,.08)}
+tr.archived td{opacity:.5}
+.c-fav{width:28px;padding-right:0}
+.c-rank{color:var(--dim);width:44px;font-size:13px}
+.c-repo{min-width:180px;max-width:280px}
+.c-repo a{font-weight:600;word-break:break-word}
+.meta{font-size:12px;color:var(--dim);margin-top:.1rem}
+.c-desc{color:#a0a0b8;min-width:260px}
+.c-desc span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.c-num{text-align:right;white-space:nowrap;color:var(--teal);font-weight:600}
+.lang-py{color:#4ec9b0}.lang-js{color:#ffd700}
+.dot{display:inline-block;width:8px;height:8px;margin-right:.4rem;vertical-align:1px}
+.dot.alive{background:var(--alive)}.dot.stale{background:var(--stale)}.dot.dead{background:var(--dead)}
+.fav{background:none;border:0;color:var(--dim);font-size:17px;line-height:1;padding:0 .1rem}
+.fav.on{color:var(--med)}
+.fav:hover{color:var(--med)}
 
 /* ── badges ── */
-.badge{
-  display:inline-flex;align-items:center;gap:3px;
-  padding:1px 5px;font-family:'Press Start 2P',monospace;font-size:6px;
-  font-weight:600;white-space:nowrap;border:1px solid currentColor;
+.badge,.cat-badge,.lic-badge,.arch-badge{
+  display:inline-flex;align-items:center;gap:3px;padding:0 .4rem;font-size:12px;font-weight:600;
+  white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;
 }
+.badge{border:1px solid currentColor}
 .badge-High{background:rgba(255,110,180,.12);color:var(--high)}
 .badge-Medium{background:rgba(255,215,0,.1);color:var(--med)}
-.badge-Low{background:rgba(80,80,100,.15);color:var(--low)}
-
-.cat-badge{
-  display:inline-flex;align-items:center;gap:3px;
-  padding:1px 5px;font-family:'IBM Plex Mono',monospace;font-size:15px;
-  font-weight:600;white-space:nowrap;
-  /* color/bg via inline style */
-}
-.lic-badge{
-  display:inline-block;padding:1px 5px;
-  font-family:'Press Start 2P',monospace;font-size:6px;
-  color:#00a896;border:1px solid #00a89640;background:rgba(0,168,150,.08);
-  white-space:nowrap;
-}
-.lic-none{color:#44445a;font-size:15px}
+.badge-Low{background:rgba(120,120,150,.12);color:var(--low)}
+.cat-badge{text-transform:none;font-size:13px}
+.lic-badge{color:var(--teal);border:1px solid #00a89660;background:rgba(0,168,150,.08)}
+.lic-none{color:var(--dim)}
+.arch-badge{color:var(--dead);border:1px solid var(--dead)}
 
 /* ── pagination ── */
 .pagination{
-  display:flex;gap:.45rem;align-items:center;justify-content:center;
-  padding:.85rem;border-top:1px solid var(--border);
-  font-family:'IBM Plex Mono',monospace;font-size:19px;color:#44445a;
+  display:flex;gap:.45rem;align-items:center;justify-content:center;flex-wrap:wrap;
+  padding:.85rem;border-top:1px solid var(--border);color:var(--muted);font-size:15px;background:var(--bg);
 }
 .pagination button{
-  background:var(--surface);border:2px solid var(--border);
-  color:var(--text);padding:.2rem .55rem;cursor:pointer;
-  font-family:'IBM Plex Mono',monospace;font-size:19px;
+  background:var(--surface);border:2px solid var(--border);color:var(--text);padding:.2rem .55rem;font-size:15px;
   box-shadow:2px 2px 0 var(--teal);
-  transition:box-shadow .07s,transform .07s,border-color .07s,color .07s;
 }
 .pagination button:disabled{opacity:.25;cursor:default;box-shadow:none}
-.pagination button:not(:disabled):hover{
-  border-color:var(--pink);color:var(--pink);box-shadow:2px 2px 0 var(--pink);
-}
-.pagination button:not(:disabled):active{box-shadow:none;transform:translate(2px,2px)}
+.pagination button:not(:disabled):hover{border-color:var(--pink);color:var(--pink);box-shadow:2px 2px 0 var(--pink)}
+.pagination input{width:4.5em;text-align:center}
 
 /* ── empty state ── */
 .empty-win{
-  width:300px;margin:2.5rem auto;background:#c0c0c0;
-  border:3px solid;border-color:#fff #808080 #808080 #fff;
+  width:300px;margin:2.5rem auto;background:#c0c0c0;border:3px solid;border-color:#fff #808080 #808080 #fff;
   font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#000;
 }
-.ew-bar{
-  background:#000080;color:#fff;padding:3px 6px;
-  display:flex;justify-content:space-between;align-items:center;
-  font-weight:bold;font-size:12px;
-}
-.ew-xbtn{
-  width:16px;height:14px;background:#c0c0c0;
-  border:2px solid;border-color:#fff #808080 #808080 #fff;
-  font-size:9px;display:inline-flex;align-items:center;justify-content:center;
-}
+.ew-bar{background:#000080;color:#fff;padding:3px 6px;font-weight:bold}
 .ew-body{padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
-.ew-ico{font-size:30px}
-.ew-btn{
-  min-width:70px;background:#c0c0c0;
-  border:2px solid;border-color:#fff #808080 #808080 #fff;
-  font-family:'Segoe UI',Arial,sans-serif;font-size:12px;padding:4px 8px;cursor:pointer;
-}
-.ew-btn:active{border-color:#808080 #fff #fff #808080}
+.ew-btn{background:#c0c0c0;border:2px solid;border-color:#fff #808080 #808080 #fff;font-size:12px;padding:4px 8px}
 
-/* ── footer ── */
-footer{
-  text-align:center;padding:.65rem;
-  color:#44445a;font-size:15px;
-  border-top:2px solid var(--border);background:var(--surface);
-  font-family:'IBM Plex Mono',monospace;
+/* ── detail drawer ── */
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:50;
+  background:var(--surface);border-left:2px solid var(--teal);box-shadow:-6px 0 0 rgba(255,110,180,.25);
+  display:flex;flex-direction:column;transform:translateX(105%);transition:transform .15s steps(4);
+}
+.drawer.open{transform:none}
+.drawer .win-bar{margin:0;box-shadow:none}
+.drawer-close{background:var(--bg);color:var(--pink);border:0;width:22px;height:20px;font-size:12px;font-weight:600}
+.drawer-body{padding:1.1rem 1.2rem 2rem;overflow-y:auto;flex:1}
+.d-name{font-size:19px;font-weight:600;word-break:break-word}
+.d-desc{color:#b8b8cc;margin:.6rem 0 .8rem;font-size:15px}
+.d-badges{display:flex;gap:.35rem;flex-wrap:wrap}
+.d-grid{display:grid;grid-template-columns:auto 1fr;gap:.25rem .9rem;margin:1rem 0;font-size:14px}
+.d-grid dt{color:var(--dim)}
+.d-grid dd{color:var(--text)}
+.d-h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--teal);margin:1.2rem 0 .45rem}
+.code{display:flex;border:2px solid var(--border);background:var(--bg)}
+.code code{flex:1;padding:.35rem .5rem;font-size:13px;overflow-x:auto;white-space:nowrap;color:var(--text)}
+.code button{background:var(--surface);border:0;border-left:2px solid var(--border);color:var(--teal);font-size:12px;font-weight:600;padding:0 .7rem}
+.hint{font-size:13px;color:var(--dim);margin-top:.35rem}
+.alts{list-style:none;display:flex;flex-direction:column;gap:.15rem}
+.alts button{
+  width:100%;text-align:left;background:none;border:1px solid transparent;color:var(--text);padding:.35rem .4rem;font-size:14px;
+}
+.alts button:hover{border-color:var(--border);background:var(--bg)}
+.alts .a-name{color:var(--pink);font-weight:600}
+.alts .a-desc{display:block;color:var(--dim);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.toast{
+  position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:60;background:var(--teal);color:var(--bg);
+  padding:.35rem .8rem;font-size:14px;font-weight:600;display:none;
+}
+
+footer{text-align:center;padding:.65rem;color:var(--muted);font-size:13px;border-top:2px solid var(--border);background:var(--surface)}
+
+/* ── mobile: rows become cards ── */
+@media (max-width:760px){
+  header{padding:1rem 1rem .9rem}
+  .ctrl-row,.chips,.active-row,.table-wrap{padding-left:1rem;padding-right:1rem}
+  .ctrl-row select{flex:1 1 calc(50% - .5rem);min-width:0}
+  #q{flex-basis:100%}
+  .count{margin-left:0}
+  thead{display:none}
+  table,tbody{display:block}
+  tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem .45rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
+  td{display:block;border:0;padding:0}
+  .c-rank,.c-days{display:none}
+  .c-fav{order:0;width:auto}
+  .c-repo{order:1;flex:1 1 0;max-width:none;min-width:0}
+  .c-desc{order:2;flex-basis:100%;min-width:0}
+  .c-cat{order:3}.c-stars{order:4}.c-pot{order:5}.c-lic{order:6}
+  .c-stars::before{content:"★ "}
 }
 </style>
 </head>
 <body>
 
-<!-- pixel art loading screen -->
 <div id="loading-screen">
   <div class="px-load-title">LOADING...</div>
   <div class="px-load-bar"><div class="px-load-fill"></div></div>
   <div class="px-load-sub">chaoticravena/repos · 2023–2026</div>
 </div>
 
-<!-- decorative Win95 error dialogs -->
-<div class="win95-bg" aria-hidden="true">
-  <div class="err-dlg" style="top:7%;left:4%;transform:rotate(-4deg)">
-    <div class="err-bar"><span>ERROR</span><span class="err-xbtn">✕</span></div>
-    <div class="err-body"><span class="err-ico">⚠</span><span>404: Too many repos.<br>Abort, Retry, Fail?</span></div>
-    <div class="err-btns"><button class="err-btn">Abort</button><button class="err-btn">Retry</button></div>
-  </div>
-  <div class="err-dlg" style="top:12%;right:5%;transform:rotate(3deg)">
-    <div class="err-bar"><span>CRITICAL ERROR</span><span class="err-xbtn">✕</span></div>
-    <div class="err-body"><span class="err-ico">🛑</span><span>Stack overflow at<br>0x0000deadbeef</span></div>
-    <div class="err-btns"><button class="err-btn">OK</button></div>
-  </div>
-  <div class="err-dlg" style="top:52%;left:1.5%;transform:rotate(-2.5deg)">
-    <div class="err-bar"><span>WARNING</span><span class="err-xbtn">✕</span></div>
-    <div class="err-body"><span class="err-ico">⚠</span><span>Infinite loop<br>detected in repos</span></div>
-    <div class="err-btns"><button class="err-btn">Ignore</button></div>
-  </div>
-  <div class="err-dlg" style="bottom:8%;right:3%;transform:rotate(5deg)">
-    <div class="err-bar"><span>FATAL</span><span class="err-xbtn">✕</span></div>
-    <div class="err-body"><span class="err-ico">💀</span><span>System halted.<br>Star a repo to continue.</span></div>
-    <div class="err-btns"><button class="err-btn">OK</button></div>
-  </div>
-</div>
-
-<div class="page-wrap">
 <header>
-  <div class="win-bar">
-    <div class="win-dots">
-      <span class="win-dot close"></span>
-      <span class="win-dot"></span>
-      <span class="win-dot"></span>
+  <div class="win95-bg" aria-hidden="true">
+    <div class="err-dlg" style="top:10%;right:4%;transform:rotate(3deg)">
+      <div class="err-bar">CRITICAL ERROR</div><div class="err-body">🛑 Stack overflow at<br>0x0000deadbeef</div>
     </div>
+    <div class="err-dlg" style="bottom:6%;right:22%;transform:rotate(-3deg)">
+      <div class="err-bar">FATAL</div><div class="err-body">💀 System halted.<br>Star a repo to continue.</div>
+    </div>
+  </div>
+  <div class="win-bar">
+    <div class="win-dots"><span class="win-dot close"></span><span class="win-dot"></span><span class="win-dot"></span></div>
     <span class="win-bar-title">chaoticravena/repos — browser.exe</span>
   </div>
   <h1>chaoticravena/repos</h1>
-  <p class="year-tag">GitHub Trending 2023–2026</p>
-  <p class="sub">Python &amp; JavaScript · sorted by days on trending · content potential &amp; category scored</p>
-  <a href="agent.html" class="agent-link">&gt;_ AGENTE AI<span class="cursor">_</span></a>
-  <div class="stats" id="stats"></div>
+  <p class="sub">GitHub Trending 2023–2026 · Python &amp; JavaScript · click a repo for details, alternatives and install</p>
+  <p class="stats-line" id="stats"></p>
+  <div class="header-actions">
+    <a href="agent.html" class="px-btn">&gt;_ AI agent<span class="cursor">_</span></a>
+    <button class="px-btn ghost" id="favBtn" aria-pressed="false">★ Favorites <span id="favCount">0</span></button>
+    <a class="px-btn ghost" href="https://github.com/chaoticravena/github-trending-site/tree/master/skills/repo-scout" target="_blank" rel="noopener" title="Claude Code skill that searches this collection + live GitHub for repos that fit your project">🔍 repo-scout skill</a>
+  </div>
 </header>
 
 <div class="controls">
-  <input type="search" id="q" placeholder="C:\repos&gt; search_"/>
-  <select id="lang">
-    <option value="">[ all langs ]</option>
-    <option value="Python">Python</option>
-    <option value="Javascript">JavaScript</option>
-  </select>
-  <select id="rating">
-    <option value="">[ all ratings ]</option>
-    <option value="High">🔥 High</option>
-    <option value="Medium">&#x26a1; Medium</option>
-    <option value="Low">💤 Low</option>
-  </select>
-  <select id="cat">
-    <option value="">[ all categories ]</option>
-    <option value="Agentic AI">🤖 Agentic AI</option>
-    <option value="LLMs &amp; Models">🧠 LLMs &amp; Models</option>
-    <option value="Image &amp; Video">🎨 Image &amp; Video</option>
-    <option value="Audio &amp; Voice">🎙&#xfe0f; Audio &amp; Voice</option>
-    <option value="Data &amp; Analytics">📊 Data &amp; Analytics</option>
-    <option value="Web &amp; APIs">🌐 Web &amp; APIs</option>
-    <option value="DevTools">🔧 DevTools</option>
-    <option value="Security">🔒 Security</option>
-    <option value="Learning">📚 Learning</option>
-    <option value="Games &amp; Creative">🎮 Games &amp; Creative</option>
-    <option value="Self-hosted">🏠 Self-hosted</option>
-    <option value="Automation &amp; Bots">&#x2699;&#xfe0f; Automation &amp; Bots</option>
-    <option value="Other">🔀 Other</option>
-  </select>
-  <select id="lic">
-    <option value="">[ all licenses ]</option>
-    <option value="MIT">MIT</option>
-    <option value="Apache-2.0">Apache-2.0</option>
-    <option value="GPL-3.0">GPL-3.0</option>
-    <option value="GPL-2.0">GPL-2.0</option>
-    <option value="AGPL-3.0">AGPL-3.0</option>
-    <option value="BSD-3-Clause">BSD-3-Clause</option>
-    <option value="BSD-2-Clause">BSD-2-Clause</option>
-    <option value="MPL-2.0">MPL-2.0</option>
-    <option value="LGPL-2.1">LGPL-2.1</option>
-    <option value="ISC">ISC</option>
-    <option value="CC0-1.0">CC0-1.0</option>
-    <option value="Unlicense">Unlicense</option>
-    <option value="NOASSERTION">NOASSERTION</option>
-    <option value="__null__">No license</option>
-  </select>
-  <span class="count" id="count"></span>
+  <div class="ctrl-row">
+    <input type="search" id="q" placeholder="search name or description… ( / )" aria-label="Search"/>
+    <select id="lang" aria-label="Language">
+      <option value="">all languages</option>
+      <option value="Python">Python</option>
+      <option value="Javascript">JavaScript</option>
+    </select>
+    <select id="status" aria-label="Status">
+      <option value="">any status</option>
+      <option value="alive">not archived</option>
+      <option value="active">commit in last 90 days</option>
+      <option value="hot">trending in last 30 days</option>
+    </select>
+    <select id="lic" aria-label="License">
+      <option value="">any license</option>
+      <option value="__commercial__">✓ OK for commercial use (MIT, Apache, BSD, ISC…)</option>
+      <option value="MIT">MIT</option>
+      <option value="Apache-2.0">Apache-2.0</option>
+      <option value="GPL-3.0">GPL-3.0</option>
+      <option value="AGPL-3.0">AGPL-3.0</option>
+      <option value="BSD-3-Clause">BSD-3-Clause</option>
+      <option value="MPL-2.0">MPL-2.0</option>
+      <option value="NOASSERTION">Other (NOASSERTION)</option>
+      <option value="__null__">No license</option>
+    </select>
+    <select id="rating" aria-label="Potential" title="Potential: how strongly the repo trended (High = many trending appearances)">
+      <option value="">any potential</option>
+      <option value="High">🔥 High</option>
+      <option value="Medium">⚡ Medium</option>
+      <option value="Low">💤 Low</option>
+    </select>
+    <select id="sort" aria-label="Sort by">
+      <option value="rank">sort: days on trending</option>
+      <option value="stars">sort: stars</option>
+      <option value="last_seen">sort: recently trending</option>
+      <option value="pushed">sort: latest commit</option>
+      <option value="name">sort: name</option>
+    </select>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="Category"></div>
+  <div class="active-row" id="active"></div>
 </div>
 
 <div class="table-wrap">
-<table id="tbl">
+<table>
   <thead>
     <tr>
-      <th data-col="rank" class="sort-asc">#</th>
+      <th class="c-fav" aria-label="Favorite"></th>
+      <th data-col="rank">#</th>
       <th data-col="name">Repo</th>
-      <th data-col="category">Category</th>
-      <th data-col="lang">Lang</th>
-      <th data-col="days">Days</th>
-      <th data-col="desc">Description</th>
-      <th data-col="rating">Potential</th>
-      <th data-col="license">License</th>
+      <th>Description</th>
+      <th>Category</th>
+      <th data-col="stars" class="c-num">★ Stars</th>
+      <th data-col="days" class="c-num" title="Days on GitHub Trending since 2023">Days</th>
+      <th title="Potential: how strongly the repo trended (High = many trending appearances)">Potential ⓘ</th>
+      <th>License</th>
     </tr>
   </thead>
   <tbody id="tbody"></tbody>
 </table>
 </div>
 <div class="pagination" id="pager"></div>
-<footer>data :: <a href="https://github.com/trending" target="_blank">github.com/trending</a> · 2023–2026 · chaoticravena/github-trending-site</footer>
-</div>
+<footer>data :: <a href="https://github.com/bonfy/github-trending" target="_blank" rel="noopener">bonfy/github-trending</a> + GitHub API · <a href="https://github.com/chaoticravena/github-trending-site" target="_blank" rel="noopener">chaoticravena/github-trending-site</a></footer>
+
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="dTitle">
+  <div class="win-bar">
+    <div class="win-dots"><span class="win-dot close"></span><span class="win-dot"></span></div>
+    <span class="win-bar-title" id="dTitle">repo.exe</span>
+    <button class="drawer-close" id="dClose" aria-label="Close">✕</button>
+  </div>
+  <div class="drawer-body" id="dBody"></div>
+</aside>
+<div class="toast" id="toast" role="status"></div>
 
 <script src="data.js"></script>
 <script>
-const RATING_EMOJI = {High:"🔥",Medium:"&#x26a1;",Low:"💤"};
-const CATS = {
-  "Agentic AI":        {e:"🤖", c:"#a78bfa", bg:"#1e1040"},
-  "LLMs & Models":     {e:"🧠", c:"#60a5fa", bg:"#0d1e3d"},
-  "Image & Video":     {e:"🎨", c:"#e879f9", bg:"#2a0e2e"},
-  "Audio & Voice":     {e:"🎙️", c:"#34d399", bg:"#0a2418"},
-  "Data & Analytics":  {e:"📊", c:"#fb923c", bg:"#2a1500"},
-  "Web & APIs":        {e:"🌐", c:"#38bdf8", bg:"#0a1e30"},
-  "DevTools":          {e:"🔧", c:"#9ca3af", bg:"#1a1f27"},
-  "Security":          {e:"🔒", c:"#f87171", bg:"#2a0d0d"},
-  "Learning":          {e:"📚", c:"#a3e635", bg:"#162000"},
-  "Games & Creative":  {e:"🎮", c:"#818cf8", bg:"#141429"},
-  "Self-hosted":       {e:"🏠", c:"#4ade80", bg:"#0a2010"},
-  "Automation & Bots": {e:"⚙️", c:"#fbbf24", bg:"#2a1800"},
-  "Other":             {e:"🔀", c:"#6b7280", bg:"#1a1e27"},
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=u=>/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(u||'')?u:'#';
+
+const RATING_EMOJI={High:"🔥",Medium:"⚡",Low:"💤"};
+const CATS={
+  "Claude Skills":     {e:"✳️",c:"#e8956b",bg:"#2a1408"},
+  "Agentic AI":        {e:"🤖",c:"#a78bfa",bg:"#1e1040"},
+  "LLMs & Models":     {e:"🧠",c:"#60a5fa",bg:"#0d1e3d"},
+  "Image & Video":     {e:"🎨",c:"#e879f9",bg:"#2a0e2e"},
+  "Audio & Voice":     {e:"🎙️",c:"#34d399",bg:"#0a2418"},
+  "Data & Analytics":  {e:"📊",c:"#fb923c",bg:"#2a1500"},
+  "Web & APIs":        {e:"🌐",c:"#38bdf8",bg:"#0a1e30"},
+  "DevTools":          {e:"🔧",c:"#b4bac4",bg:"#1a1f27"},
+  "Security":          {e:"🔒",c:"#f87171",bg:"#2a0d0d"},
+  "Learning":          {e:"📚",c:"#a3e635",bg:"#162000"},
+  "Games & Creative":  {e:"🎮",c:"#818cf8",bg:"#141429"},
+  "Self-hosted":       {e:"🏠",c:"#4ade80",bg:"#0a2010"},
+  "Automation & Bots": {e:"⚙️",c:"#fbbf24",bg:"#2a1800"},
+  "Other":             {e:"🔀",c:"#9ca3af",bg:"#1a1e27"},
 };
-const PAGE_SIZE = 50;
-let filtered=[...REPOS],sortCol="rank",sortDir=1,page=1;
-;(()=>{
-  const total=REPOS.length,
-        high=REPOS.filter(r=>r.rating==="High").length,
-        med=REPOS.filter(r=>r.rating==="Medium").length,
-        low=REPOS.filter(r=>r.rating==="Low").length,
-        py=REPOS.filter(r=>r.lang==="Python").length,
-        js=REPOS.filter(r=>r.lang==="Javascript").length;
-  document.getElementById("stats").innerHTML=[
-    `<div class="stat"><span>${total.toLocaleString()}</span> repos</div>`,
-    `<div class="stat"><span>${py.toLocaleString()}</span> Python</div>`,
-    `<div class="stat"><span>${js.toLocaleString()}</span> JavaScript</div>`,
-    `<div class="stat"><span style="color:var(--high)">${high.toLocaleString()}</span> 🔥 High</div>`,
-    `<div class="stat"><span style="color:var(--med)">${med.toLocaleString()}</span> &#x26a1; Med</div>`,
-    `<div class="stat"><span style="color:var(--low)">${low.toLocaleString()}</span> 💤 Low</div>`,
-  ].join("");
+const COMMERCIAL=new Set(["MIT","Apache-2.0","BSD-3-Clause","BSD-2-Clause","ISC","0BSD","Unlicense","CC0-1.0","Zlib","BSL-1.0","MIT-0"]);
+const PAGE_SIZE=50, DAY=864e5, NOW=Date.now();
+const BY_NAME=new Map(REPOS.map(r=>[r.name,r]));
+const LATEST_SEEN=REPOS.reduce((m,r)=>r.last_seen>m?r.last_seen:m,"");
+const HOT_SINCE=LATEST_SEEN?new Date(Date.parse(LATEST_SEEN)-30*DAY).toISOString().slice(0,10):"";
+const NUMERIC_DESC=new Set(["stars","days","last_seen","pushed"]);
+
+let filtered=[],page=1,sortCol="rank",sortDir=1,cat="",favOnly=false,openRepo=null;
+
+// ── helpers ──
+const ageDays=d=>d?Math.floor((NOW-Date.parse(d))/DAY):Infinity;
+function ago(d){
+  const n=ageDays(d);
+  if(n===Infinity)return"—";
+  if(n<1)return"today";if(n<30)return`${n}d ago`;if(n<365)return`${Math.floor(n/30)}mo ago`;
+  return`${(n/365).toFixed(1)}y ago`;
+}
+const fmtStars=n=>n==null?"—":n>=1e3?(n/1e3).toFixed(n>=1e4?0:1)+"k":String(n);
+function health(r){
+  if(r.archived)return["dead","archived"];
+  const a=ageDays(r.pushed);
+  if(a<=90)return["alive","active: commit in last 90 days"];
+  if(a<=365)return["stale","slowing: last commit "+ago(r.pushed)];
+  return["dead","inactive: last commit "+ago(r.pushed)];
+}
+function catBadge(c){
+  const i=CATS[c]||CATS.Other;
+  return`<span class="cat-badge" style="background:${i.bg};color:${i.c}">${i.e} ${esc(c)}</span>`;
+}
+const licBadge=l=>l?`<span class="lic-badge">${esc(l)}</span>`:'<span class="lic-none">—</span>';
+function toast(msg){const t=$("toast");t.textContent=msg;t.style.display="block";clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.display="none",1600);}
+async function copy(text,msg){try{await navigator.clipboard.writeText(text);toast(msg||"copied");}catch{toast("copy failed");}}
+
+// ── favorites (per-browser) ──
+let favs=new Set();
+try{favs=new Set(JSON.parse(localStorage.getItem("favs")||"[]"));}catch{}
+function saveFavs(){try{localStorage.setItem("favs",JSON.stringify([...favs]));}catch{}$("favCount").textContent=favs.size;}
+function toggleFav(name){favs.has(name)?favs.delete(name):favs.add(name);saveFavs();}
+
+// ── header stats + chips ──
+(()=>{
+  const n=f=>REPOS.filter(f).length;
+  $("stats").innerHTML=`<b>${REPOS.length.toLocaleString()}</b> repos · <b>${n(r=>r.lang==="Python").toLocaleString()}</b> Python · `+
+    `<b>${n(r=>r.lang==="Javascript").toLocaleString()}</b> JS · <b>${n(r=>!r.archived).toLocaleString()}</b> not archived`+
+    (LATEST_SEEN?` · data up to ${LATEST_SEEN}`:"");
+  const counts={};REPOS.forEach(r=>counts[r.category]=(counts[r.category]||0)+1);
+  $("chips").innerHTML=`<button class="chip" data-cat="">all<span class="n">${REPOS.length}</span></button>`+
+    Object.keys(CATS).filter(c=>counts[c]).map(c=>
+      `<button class="chip" data-cat="${esc(c)}" style="--c:${CATS[c].c};--bgc:${CATS[c].bg}">${CATS[c].e} ${esc(c)}<span class="n">${counts[c]}</span></button>`).join("");
+  saveFavs();
 })();
 
-// ── URL state ─────────────────────────────────────────────────────────────────
-function _urlParams(){
-  const p=new URLSearchParams(location.search);
-  return{q:p.get('q')||'',lang:p.get('lang')||'',pot:p.get('pot')||'',cat:p.get('cat')||'',lic:p.get('lic')||'',pg:parseInt(p.get('pg'))||1};
-}
+// ── URL state ──
+const SELECTS=["lang","status","lic","rating"];
 function applyURLState(){
-  const{q,lang,pot,cat,lic,pg}=_urlParams();
-  document.getElementById('q').value=q;
-  document.getElementById('lang').value=lang;
-  document.getElementById('rating').value=pot;
-  document.getElementById('cat').value=cat;
-  document.getElementById('lic').value=lic;
-  page=pg;
+  const p=new URLSearchParams(location.search);
+  $("q").value=p.get("q")||"";
+  SELECTS.forEach(id=>$(id).value=p.get(id==="rating"?"pot":id)||"");
+  cat=p.get("cat")||"";favOnly=p.get("fav")==="1";
+  sortCol=p.get("sort")||"rank";
+  sortDir=p.get("dir")==="desc"?-1:p.get("dir")==="asc"?1:(NUMERIC_DESC.has(sortCol)?-1:1);
+  page=parseInt(p.get("pg"))||1;
+  openRepo=p.get("repo");
 }
 function pushURL(replace){
-  const q=document.getElementById('q').value,
-        lg=document.getElementById('lang').value,
-        rt=document.getElementById('rating').value,
-        ct=document.getElementById('cat').value,
-        lc=document.getElementById('lic').value;
   const p=new URLSearchParams();
-  if(q)p.set('q',q);if(lg)p.set('lang',lg);if(rt)p.set('pot',rt);if(ct)p.set('cat',ct);if(lc)p.set('lic',lc);
-  if(page>1)p.set('pg',page);
+  const q=$("q").value.trim();if(q)p.set("q",q);
+  SELECTS.forEach(id=>{const v=$(id).value;if(v)p.set(id==="rating"?"pot":id,v);});
+  if(cat)p.set("cat",cat);if(favOnly)p.set("fav","1");
+  if(sortCol!=="rank"||sortDir!==1){p.set("sort",sortCol);p.set("dir",sortDir===1?"asc":"desc");}
+  if(page>1)p.set("pg",page);
+  if(openRepo)p.set("repo",openRepo);
   const url=p.toString()?`?${p}`:location.pathname;
-  if(replace)history.replaceState({},'',url);
-  else history.pushState({},'',url);
+  replace?history.replaceState({},"",url):history.pushState({},"",url);
 }
-window.addEventListener('popstate',()=>{applyURLState();applyFilters(false);});
+window.addEventListener("popstate",()=>{applyURLState();applyFilters(false);syncDrawer();});
 
+// ── filtering ──
+function matches(r,q,lg,st,lc,rt){
+  if(q&&!r.name.toLowerCase().includes(q)&&!(r.desc||"").toLowerCase().includes(q))return false;
+  if(lg&&r.lang!==lg)return false;
+  if(rt&&r.rating!==rt)return false;
+  if(cat&&r.category!==cat)return false;
+  if(favOnly&&!favs.has(r.name))return false;
+  if(st==="alive"&&r.archived)return false;
+  if(st==="active"&&(r.archived||ageDays(r.pushed)>90))return false;
+  if(st==="hot"&&!(r.last_seen>=HOT_SINCE))return false;
+  if(lc==="__null__"&&r.license!=null)return false;
+  if(lc==="__commercial__"&&!COMMERCIAL.has(r.license))return false;
+  if(lc&&lc[0]!=="_"&&r.license!==lc)return false;
+  return true;
+}
 function applyFilters(resetPage=true){
-  const q=document.getElementById("q").value.toLowerCase(),
-        lg=document.getElementById("lang").value,
-        rt=document.getElementById("rating").value,
-        ct=document.getElementById("cat").value,
-        lc=document.getElementById("lic").value;
-  filtered=REPOS.filter(r=>{
-    if(q&&!r.name.toLowerCase().includes(q)&&!(r.desc||"").toLowerCase().includes(q))return false;
-    if(lg&&r.lang!==lg)return false;
-    if(rt&&r.rating!==rt)return false;
-    if(ct&&r.category!==ct)return false;
-    if(lc){
-      if(lc==='__null__'&&r.license!=null)return false;
-      if(lc!=='__null__'&&r.license!==lc)return false;
-    }
-    return true;
-  });
+  const q=$("q").value.trim().toLowerCase(),[lg,st,lc,rt]=SELECTS.map(id=>$(id).value);
+  filtered=REPOS.filter(r=>matches(r,q,lg,st,lc,rt));
   filtered.sort((a,b)=>{
-    let av=a[sortCol]??"",bv=b[sortCol]??"";
+    let av=a[sortCol],bv=b[sortCol];
+    if(av==null&&bv==null)return 0;if(av==null)return 1;if(bv==null)return -1;   // vazios sempre no fim
     if(typeof av==="string"){av=av.toLowerCase();bv=bv.toLowerCase();}
     return av<bv?-sortDir:av>bv?sortDir:0;
   });
   if(resetPage)page=1;
   const total=Math.ceil(filtered.length/PAGE_SIZE)||1;
   if(page>total)page=total;
-  render();
+  syncControls();render();
 }
-function catBadge(cat){
-  const info=CATS[cat]||CATS["Other"];
-  return `<span class="cat-badge" style="background:${info.bg};color:${info.c}">${info.e} ${cat}</span>`;
+function clearFilters(){
+  $("q").value="";SELECTS.forEach(id=>$(id).value="");cat="";favOnly=false;
+  applyFilters();pushURL(false);
+}
+
+// ── controls state (chips, active tags, sort headers) ──
+const LABEL={lang:"lang",status:"status",lic:"license",rating:"potential"};
+function syncControls(){
+  document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c.dataset.cat===cat));
+  $("favBtn").classList.toggle("on",favOnly);$("favBtn").setAttribute("aria-pressed",favOnly);
+  $("sort").value=["rank","stars","last_seen","pushed","name"].includes(sortCol)?sortCol:"rank";
+  document.querySelectorAll("th[data-col]").forEach(th=>{
+    th.classList.remove("sort-asc","sort-desc");
+    if(th.dataset.col===sortCol)th.classList.add(sortDir===1?"sort-asc":"sort-desc");
+  });
+  const tags=[];
+  const q=$("q").value.trim();if(q)tags.push(["q",`"${q}"`]);
+  if(cat)tags.push(["cat",cat]);if(favOnly)tags.push(["fav","★ favorites"]);
+  SELECTS.forEach(id=>{const s=$(id);if(s.value)tags.push([id,`${LABEL[id]}: ${s.options[s.selectedIndex].text.replace(/ \(.*/,"")}`]);});
+  $("active").innerHTML=tags.length?tags.map(([k,t])=>`<button class="tag" data-k="${k}" title="remove">${esc(t)} ✕</button>`).join("")+
+    `<button class="clear-all" id="clearAll">clear all</button>`+
+    (favOnly&&favs.size?`<button class="clear-all" id="exportFavs">copy favorites as Markdown</button>`:"")+
+    `<span class="count" id="count"></span>`:`<span class="count" id="count"></span>`;
+}
+
+// ── render ──
+function rowHtml(r){
+  const [h,title]=health(r),fav=favs.has(r.name);
+  return`<tr data-name="${esc(r.name)}" class="${r.archived?"archived":""}${r.name===openRepo?" sel":""}">
+    <td class="c-fav"><button class="fav${fav?" on":""}" data-fav="${esc(r.name)}" aria-label="${fav?"Remove from":"Add to"} favorites" aria-pressed="${fav}">${fav?"★":"☆"}</button></td>
+    <td class="c-rank">${r.rank}</td>
+    <td class="c-repo"><span class="dot ${h}" title="${esc(title)}"></span><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">${esc(r.name)}</a>
+      <div class="meta"><span class="lang-${r.lang==="Python"?"py":"js"}">${r.lang==="Javascript"?"JS":esc(r.lang)}</span> · commit ${ago(r.pushed)}${r.archived?' · <span class="arch-badge">archived</span>':""}</div></td>
+    <td class="c-desc"><span>${esc(r.desc)}</span></td>
+    <td class="c-cat">${catBadge(r.category||"Other")}</td>
+    <td class="c-num c-stars">${fmtStars(r.stars)}</td>
+    <td class="c-num c-days">${r.days}d</td>
+    <td class="c-pot"><span class="badge badge-${esc(r.rating)}">${RATING_EMOJI[r.rating]||""} ${esc(r.rating)}</span></td>
+    <td class="c-lic">${licBadge(r.license)}</td>
+  </tr>`;
 }
 function render(){
-  const start=(page-1)*PAGE_SIZE,
-        end=Math.min(page*PAGE_SIZE,filtered.length),
-        rows=filtered.slice(start,end);
-  const old=document.getElementById("empty-state");
-  if(old)old.remove();
+  const rows=filtered.slice((page-1)*PAGE_SIZE,page*PAGE_SIZE),total=Math.ceil(filtered.length/PAGE_SIZE)||1;
+  $("empty-state")?.remove();
+  $("tbody").innerHTML=rows.map(rowHtml).join("");
   if(!rows.length){
-    document.getElementById("tbody").innerHTML="";
     const el=document.createElement("div");
     el.id="empty-state";el.className="empty-win";
-    el.innerHTML=`<div class="ew-bar"><span>ERROR — 0 results</span><span class="ew-xbtn">✕</span></div>`+
-      `<div class="ew-body"><div class="ew-ico">⚠</div>`+
-      `<div>No repos match this filter.<br>Try a different query.</div>`+
-      `<button class="ew-btn" onclick="document.getElementById('q').value='';`+
-      `document.querySelectorAll('select').forEach(s=>s.value='');applyFilters();pushURL(false)">Clear filters</button></div>`;
+    el.innerHTML=`<div class="ew-bar">ERROR — 0 results</div><div class="ew-body"><div style="font-size:30px">⚠</div>`+
+      `<div>${favOnly&&!favs.size?"No favorites yet. Click ☆ on any repo.":"No repos match these filters."}</div>`+
+      `<button class="ew-btn" id="emptyClear">Clear filters</button></div>`;
     document.querySelector(".table-wrap").appendChild(el);
-    document.getElementById("count").textContent="0 repos";
-    renderPager();return;
   }
-  document.getElementById("tbody").innerHTML=rows.map(r=>`
-    <tr>
-      <td class="rank">${r.rank}</td>
-      <td><a href="${r.url}" target="_blank">${r.name}</a></td>
-      <td>${catBadge(r.category||"Other")}</td>
-      <td class="lang-${r.lang==="Python"?"py":"js"}">${r.lang==="Javascript"?"JS":r.lang}</td>
-      <td class="days">${r.days}d</td>
-      <td class="desc">${r.desc||""}</td>
-      <td><span class="badge badge-${r.rating}">${RATING_EMOJI[r.rating]} ${r.rating}</span></td>
-      <td>${r.license?`<span class="lic-badge">${r.license}</span>`:'<span class="lic-none">—</span>'}</td>
-    </tr>`).join("");
-  document.getElementById("count").textContent=
-    `${filtered.length.toLocaleString()} repos · pg ${page}/${Math.ceil(filtered.length/PAGE_SIZE)||1}`;
-  renderPager();
+  $("count").textContent=`${filtered.length.toLocaleString()} repos · page ${page}/${total}`;
+  renderPager(total);
 }
-function renderPager(){
-  const total=Math.ceil(filtered.length/PAGE_SIZE)||1,p=document.getElementById("pager");
-  p.innerHTML=`
-    <button onclick="goPage(1)" ${page<=1?"disabled":""}>[|&lt;]</button>
-    <button onclick="goPage(${page-1})" ${page<=1?"disabled":""}>[&lt;&lt;]</button>
-    <span>[ ${page} / ${total} ]</span>
-    <button onclick="goPage(${page+1})" ${page>=total?"disabled":""}>[&gt;&gt;]</button>
-    <button onclick="goPage(${total})" ${page>=total?"disabled":""}>[&gt;|]</button>`;
+function renderPager(total){
+  $("pager").innerHTML=total<=1?"":`
+    <button data-pg="1" ${page<=1?"disabled":""} aria-label="First page">[|&lt;]</button>
+    <button data-pg="${page-1}" ${page<=1?"disabled":""} aria-label="Previous page">[&lt;&lt;]</button>
+    <span>page <input type="number" id="pgInput" min="1" max="${total}" value="${page}" aria-label="Page number"> / ${total}</span>
+    <button data-pg="${page+1}" ${page>=total?"disabled":""} aria-label="Next page">[&gt;&gt;]</button>
+    <button data-pg="${total}" ${page>=total?"disabled":""} aria-label="Last page">[&gt;|]</button>`;
 }
-function goPage(n){page=n;render();window.scrollTo(0,0);pushURL(false);}
-document.querySelectorAll("th[data-col]").forEach(th=>{
-  th.addEventListener("click",()=>{
-    const col=th.dataset.col;
-    if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=1;}
-    document.querySelectorAll("th").forEach(t=>t.classList.remove("sort-asc","sort-desc"));
-    th.classList.add(sortDir===1?"sort-asc":"sort-desc");
-    applyFilters();pushURL(false);
-  });
+function goPage(n){
+  const total=Math.ceil(filtered.length/PAGE_SIZE)||1;
+  page=Math.min(Math.max(1,n|0),total);render();
+  document.querySelector(".table-wrap").scrollIntoView();pushURL(false);
+}
+
+// ── drawer ──
+let SIMILAR=null;
+async function loadSimilar(){
+  if(SIMILAR)return SIMILAR;
+  const r=await fetch("data/similar.json");
+  if(!r.ok)throw new Error(r.status);
+  const {names,sim}=await r.json();
+  SIMILAR=new Map(names.map((n,i)=>[n,sim[i].map(j=>names[j])]));
+  return SIMILAR;
+}
+function drawerHtml(r){
+  const [h,title]=health(r),fav=favs.has(r.name),url=safeUrl(r.url);
+  const clone=`git clone ${url}.git`;
+  return`<a class="d-name" href="${esc(url)}" target="_blank" rel="noopener">${esc(r.name)} ↗</a>
+    <p class="d-desc">${esc(r.desc)||"<i>no description</i>"}</p>
+    <div class="d-badges">${catBadge(r.category||"Other")}<span class="badge badge-${esc(r.rating)}">${RATING_EMOJI[r.rating]||""} ${esc(r.rating)}</span>${licBadge(r.license)}${r.archived?'<span class="arch-badge">archived</span>':""}</div>
+    <dl class="d-grid">
+      <dt>status</dt><dd><span class="dot ${h}"></span>${esc(title)}</dd>
+      <dt>stars</dt><dd>${r.stars!=null?r.stars.toLocaleString():"—"}</dd>
+      <dt>last commit</dt><dd>${r.pushed?`${r.pushed} (${ago(r.pushed)})`:"—"}</dd>
+      <dt>on trending</dt><dd>${r.days} days${r.last_seen?` · last seen ${r.last_seen}`:""}</dd>
+      <dt>language</dt><dd>${esc(r.lang)}</dd>
+      <dt>license</dt><dd>${r.license?esc(r.license)+(COMMERCIAL.has(r.license)?" · OK for commercial use":/GPL/.test(r.license)?" · copyleft":""):"none declared"}</dd>
+    </dl>
+    <div class="d-h">use it</div>
+    <div class="code"><code>${esc(clone)}</code><button data-copy="${esc(clone)}">COPY</button></div>
+    ${r.category==="Claude Skills"?'<p class="hint">Claude skill? Copy the skill folder (the one with SKILL.md) into <code>~/.claude/skills/</code>, or follow the README if it ships as a plugin.</p>':""}
+    <div class="d-actions">
+      <button class="px-btn ghost" data-fav="${esc(r.name)}">${fav?"★ in favorites":"☆ add to favorites"}</button>
+      <button class="px-btn ghost" data-copy="${esc(location.origin+location.pathname+"?repo="+encodeURIComponent(r.name))}" data-msg="link copied">⧉ share link</button>
+    </div>
+    <div class="d-h">similar repos</div>
+    <ul class="alts" id="alts"><li class="hint">loading…</li></ul>`;
+}
+async function fillAlts(r){
+  try{
+    const list=(await loadSimilar()).get(r.name)||[];
+    if(openRepo!==r.name)return;
+    const items=list.map(n=>BY_NAME.get(n)).filter(Boolean);
+    $("alts").innerHTML=items.length?items.map(a=>{
+      const [h]=health(a);
+      return`<li><button data-open="${esc(a.name)}"><span class="dot ${h}"></span><span class="a-name">${esc(a.name)}</span> <span style="color:var(--dim)">★ ${fmtStars(a.stars)}</span><span class="a-desc">${esc(a.desc)}</span></button></li>`;
+    }).join(""):'<li class="hint">no suggestions for this repo yet</li>';
+  }catch{ if($("alts"))$("alts").innerHTML='<li class="hint">could not load suggestions</li>'; }
+}
+function syncDrawer(){
+  const r=openRepo&&BY_NAME.get(openRepo),d=$("drawer");
+  document.querySelectorAll("tbody tr").forEach(tr=>tr.classList.toggle("sel",tr.dataset.name===openRepo));
+  if(!r){d.classList.remove("open");d.setAttribute("aria-hidden","true");return;}
+  $("dTitle").textContent=r.name.split("/")[1]+".exe";
+  $("dBody").innerHTML=drawerHtml(r);$("dBody").scrollTop=0;
+  d.classList.add("open");d.setAttribute("aria-hidden","false");
+  fillAlts(r);
+}
+function openDrawer(name){openRepo=name;syncDrawer();pushURL(false);$("dClose").focus();}
+function closeDrawer(){if(!openRepo)return;openRepo=null;syncDrawer();pushURL(false);}
+
+// ── events ──
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-fav],[data-copy],[data-open],[data-pg],[data-cat],.tag,#clearAll,#emptyClear,#exportFavs");
+  if(t){
+    if(t.dataset.fav){
+      toggleFav(t.dataset.fav);
+      if(favOnly)applyFilters(false);else render();
+      if(openRepo)syncDrawer();
+      return;
+    }
+    if(t.dataset.copy)return copy(t.dataset.copy,t.dataset.msg);
+    if(t.dataset.open)return openDrawer(t.dataset.open);
+    if(t.dataset.pg)return goPage(+t.dataset.pg);
+    if(t.dataset.cat!==undefined){cat=t.dataset.cat;applyFilters();pushURL(false);return;}
+    if(t.classList.contains("tag")){
+      const k=t.dataset.k;
+      if(k==="q")$("q").value="";else if(k==="cat")cat="";else if(k==="fav")favOnly=false;else $(k).value="";
+      applyFilters();pushURL(false);return;
+    }
+    if(t.id==="exportFavs"){
+      const md=[...favs].map(n=>BY_NAME.get(n)).filter(Boolean)
+        .map(r=>`- [${r.name}](${r.url})${r.license?` (${r.license})`:""}: ${r.desc||""}`).join("\n");
+      return copy(md,`${favs.size} favorites copied`);
+    }
+    return clearFilters();
+  }
+  const tr=e.target.closest("tbody tr");
+  if(tr&&!e.target.closest("a"))openDrawer(tr.dataset.name);
 });
-["lang","rating","cat","lic"].forEach(id=>
-  document.getElementById(id).addEventListener("change",()=>{applyFilters();pushURL(false);}));
+$("dClose").addEventListener("click",closeDrawer);
+$("favBtn").addEventListener("click",()=>{favOnly=!favOnly;applyFilters();pushURL(false);});
+document.querySelectorAll("th[data-col]").forEach(th=>th.addEventListener("click",()=>{
+  const col=th.dataset.col;
+  if(sortCol===col)sortDir*=-1;else{sortCol=col;sortDir=NUMERIC_DESC.has(col)?-1:1;}
+  applyFilters();pushURL(false);
+}));
+$("sort").addEventListener("change",e=>{sortCol=e.target.value;sortDir=NUMERIC_DESC.has(sortCol)?-1:1;applyFilters();pushURL(false);});
+SELECTS.forEach(id=>$(id).addEventListener("change",()=>{applyFilters();pushURL(false);}));
 let _st;
-document.getElementById("q").addEventListener("input",()=>{
-  clearTimeout(_st);_st=setTimeout(()=>{applyFilters();pushURL(true);},200);
+$("q").addEventListener("input",()=>{clearTimeout(_st);_st=setTimeout(()=>{applyFilters();pushURL(true);},200);});
+$("pager").addEventListener("change",e=>{if(e.target.id==="pgInput")goPage(+e.target.value);});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape")return closeDrawer();
+  if(e.key==="/"&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){e.preventDefault();$("q").focus();}
 });
-// restore state from URL on load, then render
+
 applyURLState();
 applyFilters(false);
-// remove loading screen after first render
-const _ls=document.getElementById("loading-screen");
-if(_ls)_ls.style.display="none";
+syncDrawer();
+$("loading-screen").style.display="none";
 </script>
 </body>
 </html>

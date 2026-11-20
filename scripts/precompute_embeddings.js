@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Gera embeddings para todos os repos em build-time (Node.js).
-// Saída: docs/data/repos_embeddings.json
+// Gera em build-time, a partir de docs/data/repos.json:
+//   docs/data/embeddings.json  {model, dim, urls[], q}  q = base64 de int8 (dim bytes por repo)
+//   docs/data/similar.json     {names[], sim[][]}       sim[i] = índices dos 5 repos mais parecidos (vivos)
 // Uso: node scripts/precompute_embeddings.js
 
 import { pipeline } from '@xenova/transformers';
@@ -8,61 +9,64 @@ import { readFileSync, writeFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT      = resolve(__dirname, '..');
+const ROOT  = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const MODEL = 'Xenova/all-MiniLM-L6-v2';
+const DIM   = 384;
+const TOP   = 5;
 
-const MODEL_NAME = 'Xenova/all-MiniLM-L6-v2';
-const INPUT_PATHS = [
-    resolve(ROOT, 'docs/data/repos_enriched.json'),
-    resolve(ROOT, 'docs/data/repos.json'),
-];
-const OUTPUT_PATH = resolve(ROOT, 'docs/data/repos_embeddings.json');
+const repoText = r => `${r.name} ${r.desc || ''} ${r.category || ''} ${r.lang || ''}`.trim();
 
-function loadRepos() {
-    for (const p of INPUT_PATHS) {
-        try {
-            const data = JSON.parse(readFileSync(p, 'utf8'));
-            console.log(`Lendo ${data.length} repos de ${p}`);
-            return data;
-        } catch {}
-    }
-    throw new Error('Nenhum arquivo de repos encontrado: ' + INPUT_PATHS.join(', '));
+// int8 com escala por vetor; o browser renormaliza ao decodificar, então a escala não precisa ser salva
+function quantize(vecs) {
+    const out = new Int8Array(vecs.length * DIM);
+    vecs.forEach((v, i) => {
+        let max = 0;
+        for (const x of v) max = Math.max(max, Math.abs(x));
+        for (let k = 0; k < DIM; k++) out[i * DIM + k] = Math.round(v[k] / (max || 1) * 127);
+    });
+    return Buffer.from(out.buffer).toString('base64');
 }
 
-function repoText(r) {
-    return `${r.name} ${r.desc || ''} ${r.category || ''} ${r.lang || ''}`.trim();
+// ponytail: força bruta O(n²·dim), ~15s para 6k repos; troque por ANN se passar de ~50k
+function topSimilar(vecs, alive) {
+    const n = vecs.length;
+    return vecs.map((a, i) => {
+        const best = [];   // [score, idx] em ordem decrescente
+        for (let j = 0; j < n; j++) {
+            if (j === i || !alive[j]) continue;
+            const b = vecs[j];
+            let s = 0;
+            for (let k = 0; k < DIM; k++) s += a[k] * b[k];
+            if (best.length < TOP || s > best[best.length - 1][0]) {
+                best.push([s, j]);
+                best.sort((x, y) => y[0] - x[0]);
+                if (best.length > TOP) best.pop();
+            }
+        }
+        return best.map(([, j]) => j);
+    });
 }
 
 async function main() {
-    const repos = loadRepos();
+    const repos = JSON.parse(readFileSync(resolve(ROOT, 'docs/data/repos.json'), 'utf8'));
+    console.log(`${repos.length} repos. Carregando ${MODEL}...`);
+    const extractor = await pipeline('feature-extraction', MODEL);
 
-    console.log(`Carregando modelo ${MODEL_NAME}...`);
-    const extractor = await pipeline('feature-extraction', MODEL_NAME);
-    console.log('Modelo carregado.\n');
-
-    const results = [];
-    const BATCH  = 32;
-    const total  = repos.length;
-
-    for (let i = 0; i < total; i += BATCH) {
-        const slice = repos.slice(i, Math.min(i + BATCH, total));
-        const texts = slice.map(repoText);
-
-        const out = await extractor(texts, { pooling: 'mean', normalize: true });
-
-        for (let j = 0; j < slice.length; j++) {
-            const flat = Array.from(out[j].data);
-            results.push({ url: slice[j].url, embedding: flat });
-        }
-
-        const done = Math.min(i + BATCH, total);
-        const pct  = ((done / total) * 100).toFixed(1);
-        process.stdout.write(`\r[${pct.padStart(5)}%] ${done}/${total} repos processados`);
+    const vecs = [];
+    for (let i = 0; i < repos.length; i += 32) {
+        const out = await extractor(repos.slice(i, i + 32).map(repoText), { pooling: 'mean', normalize: true });
+        for (let j = 0; j < out.dims[0]; j++) vecs.push(out.data.slice(j * DIM, (j + 1) * DIM));
+        process.stdout.write(`\r  embeddings ${vecs.length}/${repos.length}`);
     }
 
-    console.log('\n');
-    writeFileSync(OUTPUT_PATH, JSON.stringify(results));
-    console.log(`Salvo: ${OUTPUT_PATH} (${results.length} entradas)`);
+    console.log('\n  calculando vizinhos...');
+    const sim = topSimilar(vecs, repos.map(r => !r.archived));
+
+    const emb = JSON.stringify({ model: MODEL, dim: DIM, urls: repos.map(r => r.url), q: quantize(vecs) });
+    writeFileSync(resolve(ROOT, 'docs/data/embeddings.json'), emb);
+    const simJson = JSON.stringify({ names: repos.map(r => r.name), sim });
+    writeFileSync(resolve(ROOT, 'docs/data/similar.json'), simJson);
+    console.log(`Salvo: embeddings.json (${Math.round(emb.length / 1024)} KB), similar.json (${Math.round(simJson.length / 1024)} KB)`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

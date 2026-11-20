@@ -236,6 +236,8 @@ option{background:var(--surface)}
         });
     }
 
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
     // ── similarity ────────────────────────────────────────────────────────
     function cosine(a, b) {
         let dot = 0, ma = 0, mb = 0;
@@ -287,10 +289,17 @@ option{background:var(--surface)}
     // ── load precomputed embeddings from build-time JSON ──────────────────
     async function loadPrecomputed() {
         try {
-            const r = await fetch('data/repos_embeddings.json');
+            const r = await fetch('data/embeddings.json');
             if (!r.ok) return null;
-            const arr = await r.json();
-            const map = new Map(arr.map(e => [e.url, e.embedding]));
+            const { dim, urls, q } = await r.json();
+            const bytes = new Int8Array(Uint8Array.from(atob(q), c => c.charCodeAt(0)).buffer);
+            const map = new Map();
+            urls.forEach((url, i) => {
+                const v = Float32Array.from(bytes.subarray(i * dim, (i + 1) * dim));
+                const norm = Math.hypot(...v) || 1;   // int8 sem escala: renormaliza
+                for (let k = 0; k < dim; k++) v[k] /= norm;
+                map.set(url, Array.from(v));
+            });
             return map;
         } catch { return null; }
     }
@@ -463,7 +472,7 @@ option{background:var(--surface)}
             const qOut = await extractor(query, { pooling: 'mean', normalize: true });
             const qEmb = Array.from(qOut.data);
             const localResults = reposData
-                .filter(r => r.embedding)
+                .filter(r => r.embedding && !r.archived)
                 .map(r => ({ ...r, sim: cosine(qEmb, r.embedding) }))
                 .sort((a, b) => b.sim - a.sim)
                 .slice(0, MAX_LOCAL);
@@ -514,7 +523,7 @@ Retorne APENAS um array JSON válido com até 6 objetos no formato:
             setStatus('>> pronto', 'success');
         } catch (err) {
             setStatus('ERRO: ' + err.message, 'error');
-            ui.results.innerHTML = `<div class="empty-win"><div class="empty-titlebar"><span class="empty-title">ERRO</span><span class="result-close">&#x2715;</span></div><div class="empty-body"><div class="empty-ico">&#x26A0;</div><p class="empty-msg">${err.message}</p></div></div>`;
+            ui.results.innerHTML = `<div class="empty-win"><div class="empty-titlebar"><span class="empty-title">ERRO</span><span class="result-close">&#x2715;</span></div><div class="empty-body"><div class="empty-ico">&#x26A0;</div><p class="empty-msg">${esc(err.message)}</p></div></div>`;
             console.error(err);
         } finally {
             ui.overlay.classList.add('hidden');
@@ -528,18 +537,20 @@ Retorne APENAS um array JSON válido com até 6 objetos no formato:
             ui.results.innerHTML = `<div class="empty-win"><div class="empty-titlebar"><span class="empty-title">ERROR — 0 results</span><span class="result-close">&#x2715;</span></div><div class="empty-body"><div class="empty-ico">&#x26A0;</div><p class="empty-msg">Nenhum resultado encontrado.</p></div></div>`;
             return;
         }
+        // resposta da IA é não confiável (descrições de repos podem injetar prompt): escapa tudo
+        const safeUrl = u => /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(u || '') ? u : '#';
         ui.results.innerHTML = repos.map((r, i) => `
             <div class="result-card">
                 <div class="result-titlebar">
                     <span class="result-num">[${String(i+1).padStart(2,'0')}]</span>
-                    <a href="${r.url}" target="_blank" class="result-name">${r.name}</a>
+                    <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener" class="result-name">${esc(r.name)}</a>
                     <span class="result-close">&#x2715;</span>
                 </div>
                 <div class="result-body">
-                    <p class="result-desc">${r.desc || ''}</p>
+                    <p class="result-desc">${esc(r.desc)}</p>
                     <div class="result-reason">
                         <div class="result-reason-label">&#x25B6; POR QUE</div>
-                        <div class="result-reason-body">${r.reason}</div>
+                        <div class="result-reason-body">${esc(r.reason)}</div>
                     </div>
                 </div>
             </div>`).join('');
@@ -558,7 +569,7 @@ Retorne APENAS um array JSON válido com até 6 objetos no formato:
 </script>
 </head>
 <body class="min-h-screen">
-<a href="../index.html" class="back-btn">&#8592; voltar</a>
+<a href="index.html" class="back-btn">&#8592; voltar</a>
 <div class="max-w-3xl mx-auto px-4 py-12">
 
     <header class="mb-6">

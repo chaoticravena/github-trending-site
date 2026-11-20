@@ -39,8 +39,12 @@ const CATEGORIES = [
     ['Web & APIs', ['fastapi','django','flask','react','next.js','nextjs','vue','svelte','angular','graphql','nuxt','tailwind','bootstrap','express','nodejs','rest api','frontend','backend','fullstack','typescript','web framework']],
 ];
 
+const SKILLS_NAME_RE = /[\/_-]skills?$/i;
+const SKILLS_TEXT_RE = /claude[- ]?code|claude[- ](skills?|plugins?)|agent[- ]skills?|\bskills?\b.{0,80}\b(claude|codex|agents?|ai|llms?|cursor)\b|\b(claude|codex|agents?|ai|llms?|cursor)\b.{0,80}\bskills?\b/i;
+
 function categorise(name, desc) {
     const text = `${name} ${desc || ''}`.toLowerCase();
+    if (SKILLS_NAME_RE.test(name) || SKILLS_TEXT_RE.test(text)) return 'Claude Skills';
     for (const [label, kws] of CATEGORIES) {
         if (kws.some(kw => text.includes(kw))) return label;
     }
@@ -93,12 +97,13 @@ function parseBonfyMd(content) {
 function getArgs() {
     const args = process.argv.slice(2);
     const idx  = args.indexOf('--days');
-    return { days: idx >= 0 ? parseInt(args[idx + 1], 10) : 15 };
+    // --seen-only: backfill de last_seen, sem somar days nem adicionar repos
+    return { days: idx >= 0 ? parseInt(args[idx + 1], 10) : 15, seenOnly: args.includes('--seen-only') };
 }
 
 // ── main ──────────────────────────────────────────────────────────────────
 async function main() {
-    const { days } = getArgs();
+    const { days, seenOnly } = getArgs();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -124,12 +129,14 @@ async function main() {
         fetched++;
         console.log(`  ${d.toISOString().slice(0,10)}  ${String(repos.length).padStart(3)} repos (Python/JS)`);
 
+        const day = d.toISOString().slice(0, 10);
         for (const r of repos) {
             if (bonfyMap.has(r.url)) {
                 bonfyMap.get(r.url).appearances++;
+                bonfyMap.get(r.url).last_seen = day;   // datas em ordem cronológica
                 if (r.desc && !bonfyMap.get(r.url).desc) bonfyMap.get(r.url).desc = r.desc;
             } else {
-                bonfyMap.set(r.url, { ...r, appearances: 1 });
+                bonfyMap.set(r.url, { ...r, appearances: 1, last_seen: day });
             }
         }
     }
@@ -163,10 +170,12 @@ async function main() {
         const app = bonfy.appearances;
         if (existing.has(url)) {
             const r = existing.get(url);
+            if (!r.last_seen || bonfy.last_seen > r.last_seen) r.last_seen = bonfy.last_seen;
+            if (seenOnly) continue;
             r.days = (r.days || 0) + app;
             if (bonfy.desc && !r.desc) r.desc = bonfy.desc;
             updated++;
-        } else {
+        } else if (!seenOnly) {
             existing.set(url, {
                 name:   bonfy.name,
                 url,
@@ -174,6 +183,7 @@ async function main() {
                 days:   app,
                 desc:   bonfy.desc,
                 rating: app >= 5 ? 'High' : app >= 2 ? 'Medium' : 'Low',
+                last_seen: bonfy.last_seen,
             });
             added++;
         }

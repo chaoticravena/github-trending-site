@@ -27,6 +27,14 @@ jobs:
       - name: Fetch trending repos (últimos 15 dias)
         run: node scripts/fetch_trending.js --days 15
 
+      - name: Estrelas, último commit, arquivado e licença (GitHub GraphQL)
+        run: node scripts/enrich_github.js
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Embeddings e repos parecidos
+        run: node scripts/precompute_embeddings.js
+
       - name: Verificar se há mudanças
         id: changes
         run: |
@@ -37,6 +45,6 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data/repos.json docs/data.js data/repos.json
+          git add docs/data/repos.json docs/data.js data/repos.json docs/data/embeddings.json docs/data/similar.json
           git commit -m "chore: atualiza repos trending [skip ci]"
           git push
