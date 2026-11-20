@@ -25,7 +25,7 @@ SIMILAR_CACHE = os.path.join(tempfile.gettempdir(), "repo-scout-similar.json")
 CACHE_MAX_AGE = 7 * 86400  # ponytail: rebaixa o compilado 1x por semana; o pipeline roda a cada 15 dias
 CANDIDATOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "candidatos.json")  # opcional, pessoal
 RATING = {"High": 0, "Medium": 1, "Low": 2}
-COPYLEFT = re.compile(r"gpl", re.I)  # pega GPL, AGPL, LGPL
+COPYLEFT = re.compile(r"gpl|-sa\b", re.I)  # GPL, AGPL, LGPL e Creative Commons share-alike (CC-BY-SA)
 GH_FIELDS = "fullName,description,stargazersCount,pushedAt,license,url,isArchived"
 
 
@@ -258,6 +258,7 @@ def selftest():
     assert m["modelscope/FunClip"]["fonte"] == "ambos"
     assert flags_for(m["n/new"], "2025-10-01") == ["pode estar abandonado", "copyleft (AGPL-3.0)"]
     assert flags_for(m["modelscope/FunClip"], "2025-10-01") == []
+    assert flags_for({"pushed": "2026-09-01", "license": "CC-BY-SA-4.0"}, "2025-10-01") == ["copyleft (CC-BY-SA-4.0)"]
     print("selftest ok")
 
 
